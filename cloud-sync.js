@@ -47,7 +47,7 @@ function dirtySnapshots(){
 document.addEventListener('nai:statechanged',dirtyState);
 document.addEventListener('nai:snapshotschanged',dirtySnapshots);
 function saveLocalIncoming(){
- try{localStorage.setItem(SNAPSHOTS_KEY,JSON.stringify(savedSnapshots))}catch(e){note('端末保存容量の上限に達しました。JSONバックアップを取ってください。',true)}
+ try{localStorage.setItem(SNAPSHOTS_KEY,JSON.stringify(savedSnapshots));return true}catch(e){note('端末保存容量の上限に達しました。既存の保存データは維持しています。JSONバックアップを取ってください。',true);return false}
 }
 function cleanRemoteSnapObjects(remote){
  const output={};
@@ -75,8 +75,10 @@ function applyIncomingSnapshots(value){
  suppress=true;
  try{
   const all=cleanRemoteSnapObjects(value);
-  savedSnapshots=validateSnapshots(Object.values(all).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))));
-  saveLocalIncoming();renderSnapshots();
+   const previous=savedSnapshots;
+   savedSnapshots=validateSnapshots(Object.values(all).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))));
+   if(!saveLocalIncoming()){savedSnapshots=previous;return}
+   renderSnapshots();
  }finally{suppress=false}
 }
 function profilePayload(){return {state:captureSettings(),customLooks,favoriteTags,draftImageData,updatedAt:firebase.database.ServerValue.TIMESTAMP,source:deviceId}}
@@ -95,12 +97,14 @@ async function pushSnapshots(){
  if(!snapsPending)return;
  snapsPending=false;
  try{
-  const current=snapshotsPayload(),updates={};
-  for(const [id,s] of Object.entries(current))if(JSON.stringify(remoteSnapshots[id])!==JSON.stringify(s))updates[id]=s;
-  for(const id of Object.keys(remoteSnapshots))if(!current[id])updates[id]=null;
-  if(Object.keys(updates).length){
-   await snapsRef.update(updates);
-  }
+   const current=snapshotsPayload(),updates=[];
+   for(const [id,s] of Object.entries(current))if(JSON.stringify(remoteSnapshots[id])!==JSON.stringify(s))updates.push([id,s]);
+   for(const id of Object.keys(remoteSnapshots))if(!current[id])updates.push([id,null]);
+   // Write one snapshot per request so 200 image-bearing entries do not become one oversized RTDB update.
+   for(const [id,s] of updates){
+    if(s===null){await snapsRef.child(id).remove();delete remoteSnapshots[id]}
+    else{await snapsRef.child(id).set(s);remoteSnapshots[id]=s}
+   }
   note('画像付き保存セットをクラウドに同期しました。');
  }catch(e){snapsPending=true;note('保存セットの同期に失敗：'+e.message,true)}
 }

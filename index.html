@@ -729,8 +729,8 @@ byId('saveCustomLook').addEventListener('click',saveCurrentLook);
 // v11: full setting snapshots; each snapshot is an independent copy of the current setup.
 const SNAPSHOTS_KEY='nai_prompt_studio_snapshots_v12';
 const PREV_SNAPSHOTS_KEY='nai_prompt_studio_snapshots_v11';
-const MAX_SNAPSHOTS=40;
-let savedSnapshots=[],draftImageData='',replacingSnapshotImageId=null;
+const MAX_SNAPSHOTS=200;
+let savedSnapshots=[],draftImageData='',replacingSnapshotImageId=null,snapshotStorageError=false;
 const isSavedImage=x=>typeof x==='string'&&x.length<450000&&/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(x);
 function captureSettings(){
  const state={};
@@ -771,7 +771,7 @@ function makeSnapshotId(){return Date.now().toString(36)+'-'+Math.random().toStr
 function readSnapshots(){
  try{savedSnapshots=validateSnapshots(JSON.parse(localStorage.getItem(SNAPSHOTS_KEY)||localStorage.getItem(PREV_SNAPSHOTS_KEY)||'[]'))}catch(e){savedSnapshots=[]}
 }
-function persistSnapshots(){try{localStorage.setItem(SNAPSHOTS_KEY,JSON.stringify(savedSnapshots));document.dispatchEvent(new Event('nai:snapshotschanged'));return true}catch(e){byId('snapshotStatus').textContent='保存容量が不足しました。画像を減らすかJSONバックアップで保存してください。';return false}}
+function persistSnapshots(){snapshotStorageError=false;try{localStorage.setItem(SNAPSHOTS_KEY,JSON.stringify(savedSnapshots));document.dispatchEvent(new Event('nai:snapshotschanged'));return true}catch(e){snapshotStorageError=true;setSnapshotStatus('保存できませんでした。既存データは変更していません。JSONバックアップへ保存するか、不要な画像付き保存を整理してください。');return false}}
 function uniqueSnapshotName(candidate){
  const name=(candidate.trim()||'無題の設定').slice(0,48);
  if(!savedSnapshots.some(p=>p.name===name))return name;
@@ -781,7 +781,7 @@ function uniqueSnapshotName(candidate){
 }
 function setSnapshotStatus(message){byId('snapshotStatus').textContent=message;byId('copyStatus').textContent=message}
 function saveNamedSnapshot(duplicate=false){
- if(savedSnapshots.length>=MAX_SNAPSHOTS){setSnapshotStatus('最大40件までです。不要な保存を削除するか、JSONバックアップしてください。');return}
+  if(savedSnapshots.length>=MAX_SNAPSHOTS){setSnapshotStatus('保存上限の200件に達しています。不要な保存を削除するか、JSONバックアップしてください。');return}
  const entered=byId('snapshotName').value.trim();
  const name=uniqueSnapshotName(duplicate?(entered?entered+' - コピー':'設定のコピー'):(entered||'無題の設定'));
  const snap={id:makeSnapshotId(),name,date:new Date().toISOString(),state:captureSettings(),imageData:draftImageData};
@@ -814,7 +814,7 @@ function renderSnapshots(){
   const date=document.createElement('span');date.className='tiny muted';const d=new Date(snap.date);date.textContent=Number.isNaN(d.getTime())?'':d.toLocaleString('ja-JP');
   head.append(name,date);
   const wrap=document.createElement('div');wrap.className='snapshotlayout';
-  if(isSavedImage(snap.imageData)){const im=document.createElement('img');im.className='snapshotimage';im.src=snap.imageData;im.alt=snap.name+'の参考画像';im.title='画像を拡大表示';im.addEventListener('click',()=>viewSnapshotImage(snap.imageData,snap.name));wrap.appendChild(im)}
+  if(isSavedImage(snap.imageData)){const im=document.createElement('img');im.className='snapshotimage';im.loading='lazy';im.decoding='async';im.src=snap.imageData;im.alt=snap.name+'の参考画像';im.title='画像を拡大表示';im.addEventListener('click',()=>viewSnapshotImage(snap.imageData,snap.name));wrap.appendChild(im)}
   const contents=document.createElement('div');contents.className='snapshottext';contents.appendChild(head);wrap.appendChild(contents);row.appendChild(wrap);
   const detail=document.createElement('p');detail.className='snapshotdetail';
   const character=String(snap.state.character||'キャラ未設定');
@@ -823,11 +823,11 @@ function renderSnapshots(){
   const actions=document.createElement('div');actions.className='actions';
   const mk=(title,fn,variant='')=>{const b=document.createElement('button');b.type='button';b.className='btn'+(variant?' '+variant:'');b.textContent=title;b.addEventListener('click',fn);actions.appendChild(b)};
   mk('呼び出す',()=>{applySettings(snap.state);setDraftImage(snap.imageData||'');byId('snapshotName').value=snap.name;setSnapshotStatus(`「${snap.name}」を呼び出しました。保存元は変わりません。`)},'primary');
-  mk('複製',()=>{if(savedSnapshots.length>=MAX_SNAPSHOTS){setSnapshotStatus('最大40件です');return}const dup={id:makeSnapshotId(),name:uniqueSnapshotName(snap.name+' - コピー'),date:new Date().toISOString(),state:JSON.parse(JSON.stringify(snap.state)),imageData:snap.imageData||''};savedSnapshots.unshift(dup);if(!persistSnapshots()){savedSnapshots.shift();return}renderSnapshots();setSnapshotStatus(`「${dup.name}」を複製しました。`)});
+  mk('複製',()=>{if(savedSnapshots.length>=MAX_SNAPSHOTS){setSnapshotStatus('保存上限の200件に達しています');return}const dup={id:makeSnapshotId(),name:uniqueSnapshotName(snap.name+' - コピー'),date:new Date().toISOString(),state:JSON.parse(JSON.stringify(snap.state)),imageData:snap.imageData||''};savedSnapshots.unshift(dup);if(!persistSnapshots()){savedSnapshots.shift();return}renderSnapshots();setSnapshotStatus(`「${dup.name}」を複製しました。`)});
   mk('コピー',()=>copy(snapshotExport(snap),`「${snap.name}」の設定JSON`));
   mk('画像変更',()=>{replacingSnapshotImageId=snap.id;byId('snapshotImageFile').click()});
   if(snap.imageData)mk('画像削除',()=>{const old=snap.imageData;snap.imageData='';if(!persistSnapshots())snap.imageData=old;renderSnapshots()},'ghost');
-  mk('削除',()=>{if(!confirm(`「${snap.name}」を削除しますか？`))return;savedSnapshots=savedSnapshots.filter(item=>item.id!==snap.id);persistSnapshots();renderSnapshots();setSnapshotStatus('保存した設定を削除しました。現在の編集中データはそのままです。')},'ghost');
+  mk('削除',()=>{if(!confirm(`「${snap.name}」を削除しますか？`))return;const previous=savedSnapshots;savedSnapshots=savedSnapshots.filter(item=>item.id!==snap.id);if(!persistSnapshots()){savedSnapshots=previous;renderSnapshots();return}renderSnapshots();setSnapshotStatus('保存した設定を削除しました。現在の編集中データはそのままです。')},'ghost');
   contents.appendChild(actions);target.appendChild(row);
  }
 }
@@ -839,7 +839,7 @@ byId('applyPastedSettings').addEventListener('click',loadFromText);
 byId('jumpSnapshots').onclick=()=>byId('snapshotPanel').scrollIntoView({behavior:'smooth',block:'start'});
 
 function exportAll(){const state=captureSettings();const payload={format:'NAI-Prompt-Studio-Settings',version:13,savedAt:new Date().toISOString(),state,customLooks,favoriteTags,savedSnapshots,draftImageData};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='NAI_Prompt_Studio_backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);byId('copyStatus').textContent='バックアップを書き出しました'}
-async function importAll(file){try{if(!file||file.size>12*1024*1024)throw Error('ファイルが大きすぎます');const payload=JSON.parse(await file.text());if(payload.format!=='NAI-Prompt-Studio-Settings'||!payload.state)throw Error('バックアップファイルではありません');const data=payload.state;for(const id of stateIds){if(!(id in data))continue;const el=byId(id);if(el.type==='checkbox')el.checked=Boolean(data[id]);else if(el.tagName!=='SELECT'||[...el.options].some(o=>o.value===data[id]))el.value=String(data[id]).slice(0,5000)}extraTags=Array.isArray(data.extraTags)?data.extraTags.filter(x=>typeof x==='string').slice(0,40):[];femaleTags=Array.isArray(data.femaleTags)?data.femaleTags.filter(x=>typeof x==='string').slice(0,40):[];maleTags=Array.isArray(data.maleTags)?data.maleTags.filter(x=>typeof x==='string').slice(0,40):[];girl2Tags=Array.isArray(data.girl2Tags)?data.girl2Tags.filter(x=>typeof x==='string').slice(0,40):[];if(payload.customLooks&&typeof payload.customLooks==='object'&&!Array.isArray(payload.customLooks)){customLooks={};for(const [name,look] of Object.entries(payload.customLooks).slice(0,30)){if(!look||typeof look!=='object')continue;customLooks[name.slice(0,40)]={};for(const id of [...partIds,'styleArtistOther'])customLooks[name.slice(0,40)][id]=String(look[id]||'').slice(0,400)}persistCustomLooks()}if(Array.isArray(payload.favoriteTags)){favoriteTags=payload.favoriteTags.filter(x=>typeof x==='string').slice(0,200);saveFavorites()}if(Array.isArray(payload.savedSnapshots)){const previous=savedSnapshots;savedSnapshots=validateSnapshots(payload.savedSnapshots);if(!persistSnapshots())savedSnapshots=previous;renderSnapshots()}setDraftImage(isSavedImage(payload.draftImageData)?payload.draftImageData:'');lastStyleSnapshot=styleFields();refresh();renderCustomLooks();byId('copyStatus').textContent='設定を読み込みました'}catch(e){byId('copyStatus').textContent='読み込みに失敗: '+e.message}finally{byId('importSettingsFile').value=''}}
+async function importAll(file){try{if(!file||file.size>12*1024*1024)throw Error('ファイルが大きすぎます');const payload=JSON.parse(await file.text());if(payload.format!=='NAI-Prompt-Studio-Settings'||!payload.state)throw Error('バックアップファイルではありません');const data=payload.state;for(const id of stateIds){if(!(id in data))continue;const el=byId(id);if(el.type==='checkbox')el.checked=Boolean(data[id]);else if(el.tagName!=='SELECT'||[...el.options].some(o=>o.value===data[id]))el.value=String(data[id]).slice(0,5000)}extraTags=Array.isArray(data.extraTags)?data.extraTags.filter(x=>typeof x==='string').slice(0,40):[];femaleTags=Array.isArray(data.femaleTags)?data.femaleTags.filter(x=>typeof x==='string').slice(0,40):[];maleTags=Array.isArray(data.maleTags)?data.maleTags.filter(x=>typeof x==='string').slice(0,40):[];girl2Tags=Array.isArray(data.girl2Tags)?data.girl2Tags.filter(x=>typeof x==='string').slice(0,40):[];if(payload.customLooks&&typeof payload.customLooks==='object'&&!Array.isArray(payload.customLooks)){customLooks={};for(const [name,look] of Object.entries(payload.customLooks).slice(0,30)){if(!look||typeof look!=='object')continue;customLooks[name.slice(0,40)]={};for(const id of [...partIds,'styleArtistOther'])customLooks[name.slice(0,40)][id]=String(look[id]||'').slice(0,400)}persistCustomLooks()}if(Array.isArray(payload.favoriteTags)){favoriteTags=payload.favoriteTags.filter(x=>typeof x==='string').slice(0,200);saveFavorites()}if(Array.isArray(payload.savedSnapshots)){const previous=savedSnapshots;savedSnapshots=validateSnapshots(payload.savedSnapshots);if(!persistSnapshots())savedSnapshots=previous;renderSnapshots()}setDraftImage(isSavedImage(payload.draftImageData)?payload.draftImageData:'');lastStyleSnapshot=styleFields();refresh();renderCustomLooks();byId('copyStatus').textContent=snapshotStorageError?'保存セットは容量不足のため復元されませんでした。既存データは維持されています。':'設定を読み込みました'}catch(e){byId('copyStatus').textContent='読み込みに失敗: '+e.message}finally{byId('importSettingsFile').value=''}}
 byId('exportSettings').onclick=exportAll;
 byId('importSettingsBtn').onclick=()=>byId('importSettingsFile').click();
 byId('importSettingsFile').onchange=e=>importAll(e.target.files?.[0]);
@@ -848,7 +848,7 @@ byId('importSettingsFile').onchange=e=>importAll(e.target.files?.[0]);
  settingsInput.onchange=async e=>{
   const file=e.target.files?.[0];let panelCollapse=null;
   if(file){try{panelCollapse=JSON.parse(await file.text())?.state?.panelCollapse||null}catch(err){}}
-  await legacyImport?.call(settingsInput,e);
+  snapshotStorageError=false;await legacyImport?.call(settingsInput,e);
   if(panelCollapse){applyPanelCollapse(panelCollapse);saveState()}
  };
 }
