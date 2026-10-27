@@ -331,6 +331,7 @@
 </div>
 <footer class="footer">内蔵辞書は一般的なタグ候補を収録。Danbooruの全件ではありません。オンライン検索結果は英語タグで、登録済みの語には日本語の意味も表示します。利用件数はDanbooru上の件数です。<br>プロンプトの効き方はモデルや設定により変わります。v8では「共通 / 1人目 / 2人目」を別出力できます。パーツ別の絵柄設定は以前気に入った monobe yuri を初期値に設定しています。<br>NovelAIやDanbooruの公式ツールではない個人用テンプレートです。<br>日本語Danbooru検索は内蔵タグ辞書と同義語による変換で実現。未登録語のみ任意で <a href="https://mymemory.translated.net/doc/spec.php" target="_blank" rel="noopener noreferrer">MyMemory</a> の公開翻訳APIを使用します。オフライン翻訳には限界があります。</footer>
 </div>
+<script src="./tag-search-ranking.js"></script>
 <script>
 'use strict';
 const opts={
@@ -383,6 +384,7 @@ function buildStyle(){
  return buildStyleFromParts();
  }
 const normalize=s=>String(s).toLowerCase().normalize('NFKC').replace(/[_\-]/g,' ').replace(/\s+/g,' ').trim();
+const tagRanking=window.NaiTagSearchRanking;
 function styleTerms(text){return String(text||'').split(/[,，\n]+/).map(tag=>normalize(tag)).filter(Boolean)}
 const styleTagCatalog=new Set();
 function registerStyleTerms(text){for(const tag of styleTerms(text))styleTagCatalog.add(tag)}
@@ -630,7 +632,7 @@ async function ensureTagDictionary(){
   worker.addEventListener('message',event=>{
    const message=event.data||{};
    if(message.type==='result'&&message.id===tagDictRequest){
-    externalTagResults=(message.results||[]).map(item=>({en:item.tag,jp:item.jp||'',cat:Number(item.category),count:Number(item.count)||0,score:Number(item.score)||0,kind:item.kind||'partial'}));
+    externalTagResults=(message.results||[]).map(item=>({en:item.tag,jp:item.jp||'',cat:Number(item.category),count:Number(item.count)||0,score:Number(item.score)||0,rank:Number.isFinite(item.rank)?item.rank:undefined,kind:item.kind||'partial',verified:item.verified!==false,source:item.source||'upstream'}));
     byId('tagSearchStatus').textContent=externalTagResults.length+'件（上流辞書、完全一致・同義語・部分一致・関連語順）';
     renderTagList();
    }else if(message.type==='error'&&message.id===tagDictRequest){
@@ -711,7 +713,9 @@ function tagCard(item){
  const wrapper=document.createElement('div');wrapper.className='tagitem';
  const activeDest=byId('tagDestination').value,active=tagIsActive(en,activeDest);
  const main=document.createElement('button');main.className='tagbtn'+(active?' added':'');main.type='button';main.title=active?'選択した追加先から削除':'選択した追加先に入れる';
- const left=document.createElement('span'),a=document.createElement('span'),sub=document.createElement('span');a.className='primary';a.textContent=jp||en;sub.className='secondary';sub.textContent=[jp?'英語：'+en:'英語タグ',Number.isFinite(count)&&count>0?'使用 '+count.toLocaleString()+'件':'',typeof cat==='number'?tagLabel(cat):''].filter(Boolean).join(' · ');
+ const left=document.createElement('span'),a=document.createElement('span'),sub=document.createElement('span');a.className='primary';a.textContent=jp||en;
+ const status=item.verified===false?(item.kind==='related'?'関連候補・実在未確認':'自由プロンプト候補・実在未確認'):(item.kind==='related'?'関連タグ':'');
+ sub.className='secondary';sub.textContent=[jp?'英語：'+en:'英語タグ',status,Number.isFinite(count)&&count>0?'使用 '+count.toLocaleString()+'件':'',typeof cat==='number'?tagLabel(cat):''].filter(Boolean).join(' · ');
  left.append(a,sub);const plus=document.createElement('span');plus.className='plus';plus.textContent=active?'✓':'＋';main.append(left,plus);main.addEventListener('click',()=>addTag(en,'search'));
  const fav=document.createElement('button');fav.className='favbtn'+(favoriteTags.includes(en)?' favorite':'');fav.type='button';fav.title='お気に入りに追加・解除';fav.setAttribute('aria-label',en+'をお気に入り');fav.textContent=favoriteTags.includes(en)?'★':'☆';fav.addEventListener('click',()=>toggleFavorite(en));
  wrapper.append(main,fav);return wrapper;
@@ -724,20 +728,21 @@ function getLocalResults(){
   if(words.some(word=>!text.includes(word)))return null;
   let score=0;
   if(q){if(name===q)score=1000;else if(translated===q)score=980;else if(name.startsWith(q)||translated.startsWith(q))score=760;else if(name.includes(q)||translated.includes(q))score=560;}
-  return {en,jp:translatedText,cat:c,score,kind:score>=980?'exact':'partial'};
+  const kind=score>=980?'exact':score>=760?'prefix':'partial';
+  return {en,jp:translatedText,cat:c,score,rank:tagRanking.RANKS[kind],kind,verified:false,source:'internal'};
  }).filter(Boolean);
  if(q&&typeof jpTagSynonyms!=='undefined'){
   for(const [jp,terms] of jpTagSynonyms){
    if(normalize(jp)!==q)continue;
    for(const [index,en] of terms.entries()){
     const found=typeof localByEnglish!=='undefined'?localByEnglish.get(normalize(en)):null;
-    scored.push({en,jp:found?.[2]||jp,cat:found?.[0]||'details',score:820-index*3,kind:'synonym'});
+    const kind=index===0?'free':'related';
+    scored.push({en,jp:found?.[2]||jp,cat:found?.[0]||'details',score:820-index*3,rank:tagRanking.RANKS[kind],kind,verified:Boolean(found),source:'synonym'});
    }
   }
  }
- const combined=new Map();
- for(const item of [...scored,...(cat==='all'?externalTagResults:[])]){const key=normalize(item.en);if(!combined.has(key)||combined.get(key).score<item.score)combined.set(key,item)}
- return [...combined.values()].sort((a,b)=>b.score-a.score||a.en.localeCompare(b.en));
+ const items=[...scored,...(cat==='all'?externalTagResults:[])];
+ return tagRanking.dedupe(items,{preferGeneral:isJapanese(q)&&cat==='all'});
 }
 function renderTagList(){
  const el=byId('tagResults');el.innerHTML='';const q=normalize(byId('tagQuery').value);
@@ -756,7 +761,7 @@ function renderTagList(){
 // 日本語入力は、ローカルの同義語辞書で英語候補へ変換してからDanbooru APIへ送る。
 const jpTagSynonyms=[
  ['編み込み',['braid','braided hair']],['三つ編み',['braid']],['みつあみ',['braid']],['前髪',['bangs']],['ぱっつん',['blunt bangs']],['ツインテ',['twintails']],['ポニテ',['ponytail']],['サイドポニー',['side ponytail']],['濡れ髪',['wet hair']],['毛先',['hair tips']],['横顔',['profile','from side']],['横向き',['from side','profile']],['見下ろし',['from above']],['俯瞰',['from above']],['あおり',['from below']],['煽り',['from below']],['引き構図',['wide shot']],['遠景',['wide shot']],['顔アップ',['close-up']],['顔のアップ',['close-up']],['上半身',['upper body']],['全身',['full body']],['腰上',['cowboy shot']],['肩越し',['over shoulder']],['正面',['front view']],['後ろ姿',['from behind']],['振り向き',['looking back']],
- ['制服',['school uniform']],['パジャマ',['pajamas']],['寝間着',['pajamas']],['部屋着',['loungewear']],['私服',['casual clothes']],['ゴスロリ',['gothic lolita']],['水着',['swimsuit']],['ビキニ',['bikini']],['メイド',['maid']],['リボン',['ribbon']],['首輪',['choker']],['チョーカー',['choker']],['黒髪',['black hair']],['金髪',['blonde hair']],['銀髪',['silver hair']],['茶髪',['brown hair']],['青い目',['blue eyes']],['青目',['blue eyes']],['碧眼',['blue eyes']],['赤目',['red eyes']],['オッドアイ',['heterochromia']],
+ ['制服',['school uniform']],['パジャマ',['pajamas']],['寝間着',['pajamas']],['部屋着',['loungewear']],['私服',['casual clothes']],['ゴスロリ',['gothic lolita']],['水着',['swimsuit']],['ビキニ',['bikini']],['メイド',['maid']],['リボン',['ribbon']],['首輪',['choker']],['チョーカー',['choker']],['黒髪',['black hair']],['金髪',['blonde hair']],['銀髪',['silver hair','grey hair','white hair']],['シルバーヘア',['silver hair','grey hair','white hair']],['銀色の髪',['silver hair','grey hair','white hair']],['茶髪',['brown hair']],['青い目',['blue eyes']],['青目',['blue eyes']],['碧眼',['blue eyes']],['赤目',['red eyes']],['オッドアイ',['heterochromia']],
  ['座る',['sitting']],['椅子に座る',['sitting on chair']],['ベッドに座る',['sitting on bed']],['寝転ぶ',['lying']],['寝る',['lying']],['横になる',['lying']],['膝立ち',['kneeling']],['ひざ立ち',['kneeling']],['立つ',['standing']],['歩く',['walking']],['手を上げる',['arms up']],['手を振る',['waving']],['ピース',['peace sign']],['頬杖',['head rest']],['腕組み',['crossed arms']],['足組み',['crossed legs']],['指差し',['pointing']],
  ['笑顔',['smile']],['微笑み',['smile']],['赤面',['blush']],['照れ',['blush']],['困り顔',['worried']],['ジト目',['jitome']],['涙目',['tears in eyes']],['泣く',['crying']],['ドヤ顔',['smug']],['口を開ける',['open mouth']],['閉じた目',['eyes closed']],
  ['寝室',['bedroom']],['教室',['classroom']],['海',['beach']],['ビーチ',['beach']],['浴室',['bathroom']],['風呂',['bath']],['お風呂上がり',['after bath']],['窓際',['window']],['ソファ',['couch']],['夕焼け',['sunset']],['夜景',['night']],['雨',['rain']],['雪',['snow']],['花畑',['flower field']],['桜',['cherry blossoms']],['室内',['indoors']],['屋外',['outdoors']],['朝日',['sunlight']],['夕方',['evening']],
@@ -766,17 +771,17 @@ const isJapanese=s=>/[\u3040-\u30ff\u3400-\u9fff]/.test(s);
 const localByEnglish=new Map(allTags.map(t=>[normalize(t[1]),t]));
 function lookupJP(q){
  const normalized=normalize(q), scores=new Map();
- const add=(en,score,jp)=>{
+ const add=(en,score,jp,kind='synonym',verified=false)=>{
   en=en.replace(/_/g,' ').trim();if(!en)return;
   const k=normalize(en),prev=scores.get(k);
-  if(!prev||prev.score<score)scores.set(k,{en,score,jp:jp||'',source:'local'});
+  if(!prev||prev.score<score)scores.set(k,{en,score,rank:tagRanking.RANKS[kind],kind,verified,jp:jp||'',source:'synonym'});
  };
- for(const [jp,terms] of jpTagSynonyms){const j=normalize(jp);if(j===normalized)terms.forEach((en,i)=>add(en,120-i*3,jp));else if(j.includes(normalized)&&normalized.length>=2)terms.forEach((en,i)=>add(en,40-i*3,jp))}
- for(const [cat,en,jp] of allTags){const j=normalize(jp);if(!j)continue;if(j===normalized)add(en,110,jp);else if(j.startsWith(normalized))add(en,70,jp);else if(j.includes(normalized))add(en,50,jp)}
- return [...scores.values()].sort((a,b)=>b.score-a.score||a.en.localeCompare(b.en));
+ for(const [jp,terms] of jpTagSynonyms){const j=normalize(jp);const exact=j===normalized,partial=j.includes(normalized)&&normalized.length>=2;if(!exact&&!partial)continue;terms.forEach((en,i)=>{const found=localByEnglish.get(normalize(en));add(en,(exact?120:40)-i*3,jp,i===0?'free':'related',Boolean(found))})}
+ for(const [cat,en,jp] of allTags){const j=normalize(jp);if(!j)continue;if(j===normalized)add(en,110,jp,'exact',false);else if(j.startsWith(normalized))add(en,70,jp,'prefix',false);else if(j.includes(normalized))add(en,50,jp,'partial',false)}
+ return tagRanking.dedupe([...scores.values()],{preferGeneral:true});
 }
 function localPreview(results){
- return results.slice(0,50).map(x=>({en:x.en,jp:japaneseForItem({en:x.en,jp:localByEnglish.get(normalize(x.en))?.[2]||x.jp||''}),cat:({face:0,hair:0,clothes:0,pose:0,camera:0,scene:0,light:0,details:0})[localByEnglish.get(normalize(x.en))?.[0]]??0,source:'内蔵辞書候補'}));
+ return results.slice(0,50).map(x=>({en:x.en,jp:japaneseForItem({en:x.en,jp:localByEnglish.get(normalize(x.en))?.[2]||x.jp||''}),cat:({face:0,hair:0,clothes:0,pose:0,camera:0,scene:0,light:0,details:0})[localByEnglish.get(normalize(x.en))?.[0]]??0,score:x.score,rank:x.rank,kind:x.kind,verified:x.verified,source:x.source||'内蔵辞書候補'}));
 }
 function showConverted(original,candidates,kind){
  const el=byId('searchInterpretation');el.style.display='';
@@ -812,8 +817,9 @@ async function runOnlineSearch(){
  const timeout=setTimeout(()=>controller.abort(),12000);
  const jp=isJapanese(q);
  let matches=jp?lookupJP(q):[];
- let candidates=jp?matches.slice(0,2).map(x=>x.en):[q];
- if(jp&&matches.length){remoteTags=localPreview(matches);showConverted(q,matches.slice(0,2),'local');renderTagList()}
+ let candidates=jp?matches.slice(0,3).map(x=>x.en):[q];
+ const candidateByEnglish=new Map(matches.map(x=>[normalize(x.en),x]));
+ if(jp&&matches.length){remoteTags=localPreview(matches);showConverted(q,matches.slice(0,3),'local');renderTagList()}
  try{
   if(jp&&!candidates.length){
    byId('tagSearchStatus').textContent='内蔵辞書にないので、外部翻訳を確認しています…';
@@ -823,7 +829,7 @@ async function runOnlineSearch(){
    showConverted(q,[{en:translated}],'machine');
   }
   if(!jp){byId('searchInterpretation').style.display='none'}
-  const promises=candidates.slice(0,2).map(t=>queryDanbooru(t,controller.signal));
+  const promises=candidates.slice(0,3).map(t=>queryDanbooru(t,controller.signal));
   const results=await Promise.allSettled(promises);
   if(controller.signal.aborted)return;
   const combined=new Map(remoteTags.map(t=>[normalize(t.en),t]));
@@ -832,12 +838,17 @@ async function runOnlineSearch(){
    if(r.status!=='fulfilled')continue;success++;
    for(const entry of r.value){
     if(!entry?.name||entry.is_deprecated)continue;
-    const en=String(entry.name).replace(/_/g,' '),key=normalize(en),local=localByEnglish.get(key),prev=combined.get(key);
-    combined.set(key,{en,jp:japaneseForItem({en,jp:local?.[2]||prev?.jp||''}),cat:Number(entry.category),count:Number(entry.post_count)||0,source:'Danbooru'});
+    const en=String(entry.name).replace(/_/g,' '),key=normalize(en),local=localByEnglish.get(key),prev=combined.get(key),candidate=candidateByEnglish.get(key);
+    let kind='partial',rank=tagRanking.RANKS.partial,verified=true;
+    if(candidate){
+     if(candidate.kind==='related'){kind='related';rank=tagRanking.RANKS.related}
+     else {kind='exact';rank=tagRanking.RANKS.exact}
+    }else{kind=tagRanking.classify(en,jp?q:q);rank=tagRanking.RANKS[kind]}
+    combined.set(key,{en,jp:japaneseForItem({en,jp:local?.[2]||prev?.jp||candidate?.jp||''}),cat:Number(entry.category),count:Number(entry.post_count)||0,score:candidate?.score||0,rank,kind,verified,source:'Danbooru'});
    }
   }
   if(!success)throw new Error('Danbooruに接続できませんでした。辞書候補はそのまま利用できます。');
-  remoteTags=[...combined.values()].sort((a,b)=>(b.count??-1)-(a.count??-1));
+  remoteTags=tagRanking.dedupe([...combined.values()],{preferGeneral:jp&&!byId('onlineCategory').value});
   remoteLastQuery=q;
   byId('tagSearchStatus').textContent=(remoteTags.length)+'件表示（Danbooru照会成功）。日本語訳のないタグは英語名で表示します。';
  }catch(err){

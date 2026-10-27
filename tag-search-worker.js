@@ -1,4 +1,6 @@
 /* The large upstream dictionary is searched here, never in the page thread. */
+importScripts("tag-search-ranking.js");
+const tagRanking = self.NaiTagSearchRanking;
 let basePath = "./data/tagdb/";
 let manifest = null;
 let synonymEntries = [];
@@ -73,7 +75,10 @@ function synonymResults(query) {
       count: 0,
       category: 0,
       score: terms.includes(q) ? 820 : 680,
+      rank: tagRanking.RANKS.synonym,
       kind: "synonym",
+      verified: false,
+      source: "synonym",
       related: entry.related || []
     });
     for (const related of entry.related || []) {
@@ -84,7 +89,10 @@ function synonymResults(query) {
         count: 0,
         category: 0,
         score: 310,
-        kind: "related"
+        rank: tagRanking.RANKS.related,
+        kind: "related",
+        verified: false,
+        source: "synonym-related"
       });
     }
   }
@@ -112,17 +120,15 @@ async function search(message) {
     const rows = await loadShard(shard);
     for (const record of rows) {
       const score = scoreRecord(record, query);
-      if (score > 0) ranked.push({...record, score, kind: score >= 900 ? "exact" : "partial"});
+      if (score > 0) {
+        const kind = score >= 900 ? "exact" : score >= 760 ? "prefix" : "partial";
+        ranked.push({...record, score, rank: tagRanking.RANKS[kind], kind, verified: true, source: "upstream"});
+      }
     }
   }
-  const best = new Map();
-  for (const record of ranked) {
-    const key = normalize(record.tag);
-    if (!key || !best.has(key) || best.get(key).score < record.score) best.set(key, record);
-  }
-  return [...best.values()]
+  const preferGeneral = /[\u3040-\u30ff\u3400-\u9fff]/.test(query) && category === "all";
+  return tagRanking.dedupe(ranked, {preferGeneral})
     .map(record => ({...record, jp: japaneseFor(record)}))
-    .sort((a, b) => b.score - a.score || Number(b.count || 0) - Number(a.count || 0) || a.tag.localeCompare(b.tag))
     .slice(0, 120);
 }
 
