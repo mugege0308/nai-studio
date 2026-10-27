@@ -63,7 +63,7 @@ function applyIncomingProfile(value){
  try{
   applySettings(value.state); // v12 compatibility: also saves all form fields locally
   if(value.customLooks && typeof value.customLooks==='object' && !Array.isArray(value.customLooks)){
-   customLooks=value.customLooks;persistCustomLooks();renderCustomLooks();
+   const previousLooks=customLooks;customLooks=normalizeCustomLooks(value.customLooks);if(!persistCustomLooks())customLooks=previousLooks;renderCustomLooks();
   }
   if(Array.isArray(value.favoriteTags)){
    favoriteTags=value.favoriteTags;saveFavorites();renderTagList();
