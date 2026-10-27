@@ -108,7 +108,7 @@
      <label class="toggle" style="margin:10px 0"><input id="stylePartsMode" type="checkbox" checked>パーツ別指定を使用（旧「絵柄」選択を上書き）</label>
      <label class="toggle" style="margin:10px 0"><input id="styleDirectMode" type="checkbox">絵柄タグ全体を直接編集</label>
      <div id="styleDirectArea" class="style-direct-area" style="display:none">
-      <div class="field"><label for="styleDirectTags">絵柄タグ全体（カンマまたは改行区切り）</label><textarea id="styleDirectTags" rows="5" placeholder="例: visual novel cg, crisp lineart, cel shading, detailed irises"></textarea></div>
+      <div class="field"><label for="styleDirectTags">絵柄タグ全体（カンマまたは改行区切り）</label><textarea id="styleDirectTags" rows="5" placeholder="例: visual novel cg, crisp lineart, cel shading, detailed irises"></textarea><div class="savedrow" style="margin-top:8px"><input type="text" id="directSaveLookName" placeholder="保存名を入力" maxlength="40"><button type="button" class="btn" id="saveDirectLook">名前を付けて保存</button></div><p class="hint">保存済み絵柄はパーツ別モードと共有され、呼び出し時に編集モードも復元されます。</p></div>
       <div class="actions" style="margin-top:8px"><button type="button" class="btn" id="copyStyleToDirect">現在の絵柄タグを編集欄へコピー</button><span class="hint">既存プリセットを押すと、パーツ別設定へ戻ります。</span></div>
      </div>
      <div id="stylePartsArea">
@@ -734,7 +734,7 @@ function renderTagList(){
  const el=byId('tagResults');el.innerHTML='';const q=normalize(byId('tagQuery').value);
  let items=[];
  if(searchMode==='local')items=getLocalResults();
- else if(searchMode==='saved')items=favoriteTags.map(en=>{const found=allTags.find(x=>normalize(x[1])===normalize(en));return {en,jp:found?.[2]||'お気に入り',cat:found?.[0]||''}}).filter(t=>!q||normalize(t.en+' '+t.jp).includes(q));
+ else if(searchMode==='saved')items=favoriteTags.map(en=>{const found=allTags.find(x=>normalize(x[1])===normalize(en));return {en,jp:found?.[2]||'',cat:found?.[0]||''}}).filter(t=>!q||normalize(t.en+' '+t.jp).includes(q));
  else items=remoteTags.filter(x=>!byId('onlineCategory').value||String(x.cat)===byId('onlineCategory').value);
  const visible=items.slice(0,displayLimit);for(const item of visible)el.appendChild(tagCard(item));
  byId('resultCount').textContent=remoteLoading?'検索中…':(items.length+'件'+(items.length>displayLimit?' / '+displayLimit+'件表示':''));
@@ -767,7 +767,7 @@ function lookupJP(q){
  return [...scores.values()].sort((a,b)=>b.score-a.score||a.en.localeCompare(b.en));
 }
 function localPreview(results){
- return results.slice(0,50).map(x=>({en:x.en,jp:localByEnglish.get(normalize(x.en))?.[2]||x.jp||'日本語候補',cat:({face:0,hair:0,clothes:0,pose:0,camera:0,scene:0,light:0,details:0})[localByEnglish.get(normalize(x.en))?.[0]]??0,source:'内蔵辞書候補'}));
+ return results.slice(0,50).map(x=>({en:x.en,jp:localByEnglish.get(normalize(x.en))?.[2]||x.jp||'',cat:({face:0,hair:0,clothes:0,pose:0,camera:0,scene:0,light:0,details:0})[localByEnglish.get(normalize(x.en))?.[0]]??0,source:'内蔵辞書候補'}));
 }
 function showConverted(original,candidates,kind){
  const el=byId('searchInterpretation');el.style.display='';
@@ -890,8 +890,16 @@ function readCustomLooks(){try{customLooks=normalizeCustomLooks(JSON.parse(local
 function persistCustomLooks(){customLooksStorageError=false;try{localStorage.setItem(CUSTOM_LOOK_KEY,JSON.stringify(customLooks));document.dispatchEvent(new Event('nai:statechanged'));return true}catch(e){customLooksStorageError=true;byId('copyStatus').textContent='絵柄を保存できませんでした。既存の保存データは変更していません。';return false}}
 function applyCustomLook(look){prevLook=styleFields();for(const id of partIds)byId(id).value=look[id]||'';byId('styleArtistOther').value=look.styleArtistOther||'';byId('styleDirectTags').value=look.styleDirectTags||'';byId('styleDirectMode').checked=Boolean(look.styleDirectMode);byId('stylePartsMode').checked=look.stylePartsMode!==false;refresh()}
 function renderCustomLooks(){const p=byId('customLooks');p.replaceChildren();const names=Object.keys(customLooks);if(!names.length){const hint=document.createElement('p');hint.className='hint';hint.textContent='まだ保存した絵柄はありません。';p.appendChild(hint);return}for(const name of names){const row=document.createElement('div');row.className='customlook';const load=document.createElement('button');load.type='button';load.textContent='★ '+name;load.addEventListener('click',()=>{applyCustomLook(customLooks[name]);byId('copyStatus').textContent='保存した絵柄「'+name+'」を適用しました'});const del=document.createElement('button');del.type='button';del.textContent='削除';del.title='この保存絵柄を削除';del.addEventListener('click',()=>{if(confirm('「'+name+'」を削除しますか？')){const previous={...customLooks};delete customLooks[name];if(!persistCustomLooks()){customLooks=previous;renderCustomLooks();return}renderCustomLooks()}});row.append(load,del);p.appendChild(row)}}
-function saveCurrentLook(){const name=byId('saveLookName').value.trim();if(!name){byId('copyStatus').textContent='絵柄の名前を入力してください';return}if(Object.keys(customLooks).length>=30&&!Object.prototype.hasOwnProperty.call(customLooks,name)){byId('copyStatus').textContent='保存は最大30件です';return}const previous=customLooks[name];customLooks[name]=captureCustomLook();if(!persistCustomLooks()){if(previous)customLooks[name]=previous;else delete customLooks[name];renderCustomLooks();return}renderCustomLooks();byId('saveLookName').value='';byId('copyStatus').textContent='絵柄「'+name+'」を保存しました'}
-byId('saveCustomLook').addEventListener('click',saveCurrentLook);
+function saveCurrentLook(inputId='saveLookName'){
+ const name=byId(inputId).value.trim();
+ if(!name){byId('copyStatus').textContent='絵柄の名前を入力してください';return}
+ if(Object.keys(customLooks).length>=30&&!Object.prototype.hasOwnProperty.call(customLooks,name)){byId('copyStatus').textContent='保存は最大30件です';return}
+ const previous=customLooks[name];customLooks[name]=captureCustomLook();
+ if(!persistCustomLooks()){if(previous)customLooks[name]=previous;else delete customLooks[name];renderCustomLooks();return}
+ renderCustomLooks();byId(inputId).value='';byId('copyStatus').textContent='絵柄「'+name+'」を保存しました';
+}
+byId('saveCustomLook').addEventListener('click',()=>saveCurrentLook('saveLookName'));
+byId('saveDirectLook').addEventListener('click',()=>saveCurrentLook('directSaveLookName'));
 
 // v11: full setting snapshots; each snapshot is an independent copy of the current setup.
 const SNAPSHOTS_KEY='nai_prompt_studio_snapshots_v12';
