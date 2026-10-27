@@ -66,7 +66,12 @@ function applyIncomingProfile(value){
    const previousLooks=customLooks;customLooks=normalizeCustomLooks(value.customLooks);if(!persistCustomLooks())customLooks=previousLooks;renderCustomLooks();
   }
   if(Array.isArray(value.favoriteTags)){
-   favoriteTags=value.favoriteTags;saveFavorites();renderTagList();
+   favoriteTags=value.favoriteTags.filter(x=>typeof x==='string').slice(0,200);
+   if(!value.favoriteCollections){const known=new Set(favoriteEntries().map(x=>normalize(x.tag)));for(const tag of favoriteTags)if(!known.has(normalize(tag)))favoriteCollections.uncategorized.push({id:favoriteId('tag'),label:tag,tag});persistFavoriteCollections(false)}else saveFavorites();
+   renderTagList();
+  }
+  if(value.favoriteCollections && typeof value.favoriteCollections==='object' && !Array.isArray(value.favoriteCollections)){
+   const previous=favoriteCollections;favoriteCollections=mergeFavoriteCollections(favoriteCollections,value.favoriteCollections);if(!persistFavoriteCollections(false))favoriteCollections=previous;renderFavorites();renderTagList();
   }
   if(typeof value.draftImageData==='string')setDraftImage(isSavedImage(value.draftImageData)?value.draftImageData:'');
  }finally{suppress=false}
@@ -81,7 +86,7 @@ function applyIncomingSnapshots(value){
    renderSnapshots();
  }finally{suppress=false}
 }
-function profilePayload(){return {state:captureSettings(),customLooks,favoriteTags,draftImageData,updatedAt:firebase.database.ServerValue.TIMESTAMP,source:deviceId}}
+function profilePayload(){return {state:captureSettings(),customLooks,favoriteTags,favoriteCollections,draftImageData,updatedAt:firebase.database.ServerValue.TIMESTAMP,source:deviceId}}
 function snapshotsPayload(){const out={};for(const s of savedSnapshots)out[s.id]={id:s.id,name:s.name,date:s.date,state:s.state,imageData:isSavedImage(s.imageData)?s.imageData:''};return out}
 async function pushProfile(){
  if(!active||!profileRef||suppress)return;

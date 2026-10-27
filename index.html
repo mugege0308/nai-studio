@@ -86,6 +86,12 @@
 @media(max-width:440px){.snapshotimage{width:86px;height:86px}}
 .panel.collapsible > .panel-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:-2px 0 12px;padding-bottom:8px;border-bottom:1px solid #343750}.panel.collapsible > .panel-heading h2{margin:0;flex:1}.panel-heading .panel-toggle{flex:0 0 auto;border:1px solid #575472;border-radius:9px;background:#25273f;color:var(--ink);padding:6px 9px;font-size:12px;font-weight:700;cursor:pointer}.panel-heading .panel-toggle:focus-visible{outline:2px solid var(--accent);outline-offset:2px}.panel.collapsible.is-collapsed{padding-bottom:12px}.panel.collapsible.is-collapsed > *:not(.panel-heading){display:none}.style-direct-area{margin:10px 0 4px;padding:12px;border:1px solid #575472;border-radius:12px;background:#15162b}.style-direct-area textarea{width:100%;min-height:105px;resize:vertical;border:1px solid #44465f;background:#101222;color:var(--ink);border-radius:9px;padding:10px 11px;line-height:1.55}.style-direct-area textarea::placeholder{color:#7e809b}.panel-heading .pill{margin-left:5px}
 </style>
+<style>
+.tag-view-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}.tag-view-tab{border:1px solid #52536f;border-radius:11px;background:#242641;color:#dad7ed;padding:11px 10px;font-weight:700}.tag-view-tab.active{background:var(--accent);color:#211d20;border-color:var(--accent)}
+.tag-copy{flex:0 0 auto;border:1px solid #6a648c;border-radius:9px;background:#393451;color:#f3edcf;padding:8px 9px;font-size:12px;font-weight:700}.tag-copy:active{transform:translateY(1px)}.tagitem .tagbtn{border-radius:11px 0 0 11px}.tagitem .tag-copy{border-radius:0;border-width:0 1px 0 1px}.tagitem .favbtn{border-radius:0 10px 10px 0}
+.favorite-manager{display:grid;gap:12px}.favorite-toolbar{display:grid;grid-template-columns:1fr 1fr;gap:8px}.favorite-toolbar .full{grid-column:1 / -1}.favorite-toolbar input,.favorite-toolbar select{width:100%;border:1px solid #44465f;background:#101222;color:var(--ink);border-radius:9px;padding:10px 11px}.favorite-section{border:1px solid #44465f;border-radius:12px;padding:11px;background:#151728}.favorite-section h3{margin:0 0 8px}.favorite-folder{border:1px solid #4d4e69;border-radius:10px;margin:8px 0;padding:9px;background:#20223a}.favorite-folder-head{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.favorite-folder-head strong{flex:1;min-width:120px}.favorite-entry{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 0;border-top:1px solid #393b54}.favorite-entry:first-of-type{border-top:0}.favorite-entry .favorite-label{flex:1;min-width:150px;overflow-wrap:anywhere}.favorite-entry .favorite-en{display:block;color:var(--muted);font-size:11px}.favorite-entry .btn{padding:7px 8px;font-size:11px}.favorite-empty{color:var(--muted);font-size:12px;padding:5px 0}.favorite-modal{position:fixed;inset:0;z-index:20;background:#070814aa;display:flex;align-items:center;justify-content:center;padding:18px}.favorite-modal-card{width:min(460px,100%);border:1px solid #676284;border-radius:15px;background:#1a1c30;padding:15px;box-shadow:0 12px 50px #0009}.favorite-modal-card h3{margin:0 0 8px}.favorite-modal-card select,.favorite-modal-card input{width:100%;border:1px solid #44465f;background:#101222;color:var(--ink);border-radius:9px;padding:10px 11px;margin-top:5px}.favorite-modal-card .actions{margin-top:12px}.favorite-modal-card .favorite-remove{color:#ffc9cf}
+@media(max-width:480px){.favorite-toolbar{grid-template-columns:1fr}.favorite-toolbar .full{grid-column:auto}.tagitem .tagbtn{padding:9px 7px}.tag-copy{padding:9px 7px}.favorite-entry .btn{flex:1;min-width:76px}}
+</style>
 <link rel="manifest" href="./manifest.json"><meta name="application-name" content="NAI Prompt Studio"><meta name="mobile-web-app-capable" content="yes"></head>
 <body>
 <div class="wrap">
@@ -307,9 +313,13 @@
   </div>
 </div>
 <div id="tagsArea" class="hide">
- <section class="panel tagsearch">
+ <div id="tagViewTabs" class="tag-view-tabs" role="tablist" aria-label="タグ検索とお気に入り">
+  <button type="button" class="tag-view-tab active" id="tagSearchViewTab" role="tab" aria-selected="true">⌕ タグ検索</button>
+  <button type="button" class="tag-view-tab" id="favoriteViewTab" role="tab" aria-selected="false">★ お気に入り</button>
+ </div>
+ <section class="panel tagsearch" id="tagSearchPanel">
    <div><h2>タグを探して追加する <span class="pill">v13.0</span></h2><p class="small muted">内蔵辞書もDanbooruも日本語・英語で検索。結果の英語タグをそのままプロンプトに追加できます。</p></div>
-   <div class="modebar" role="group" aria-label="タグの検索元"><button type="button" class="modebtn active" data-mode="local">内蔵＋日本語辞書</button><button type="button" class="modebtn" data-mode="online">Danbooru検索（通信）</button><button type="button" class="modebtn" data-mode="saved">★ お気に入り</button></div>
+   <div class="modebar" role="group" aria-label="タグの検索元"><button type="button" class="modebtn" data-mode="local">内蔵＋日本語辞書</button><button type="button" class="modebtn active" data-mode="online">Danbooru検索（通信）</button></div>
    <input id="tagQuery" class="query" type="search" placeholder="例: 編み込み / 横顔 / 黒髪 / braid / beach" autocomplete="off">
    <div class="formgrid searchopts">
      <div class="field" id="localCategoryWrap"><label for="tagCategory">カテゴリ</label><select id="tagCategory"></select></div>
@@ -328,6 +338,27 @@
    <p class="note">上流辞書はPYU224/tagdb-updaterの公開タグデータをカテゴリ別に遅延読み込みします。日本語・英語の完全一致、同義語、部分一致、関連語の順で候補を並べます。更新日時や取得エラーは上の状態表示で確認できます。出典・ライセンスはdata/tagdb/LICENSE-ATTRIBUTION.mdを参照してください。Danbooru検索は公開APIへ英語の検索語を送ります。ブラウザの通信制限（CORS）などで利用できない場合があります。</p>
    <div class="actions"><button id="returnBuild" class="btn primary" type="button">← 作成画面に戻る</button></div>
  </section>
+ <section class="panel favorite-manager hide" id="favoritesPanel">
+  <div><h2>お気に入りを整理する</h2><p class="small muted">作品キャラクターと属性・構図タグをフォルダで管理できます。旧お気に入りは「未分類」に移行されています。</p></div>
+  <div class="favorite-toolbar">
+   <div class="field"><label for="favoriteFolderType">保存先の種類</label><select id="favoriteFolderType"><option value="works">作品</option><option value="attributes">属性・構図</option></select></div>
+   <div class="field"><label for="favoriteFolderSelect">表示するフォルダ</label><select id="favoriteFolderSelect"></select></div>
+   <div class="field full"><label for="favoriteFolderName">新しいフォルダ名</label><input id="favoriteFolderName" type="text" maxlength="40" placeholder="例：髪・瞳 / 東方Project"></div>
+   <div class="field"><label for="favoriteFilter">お気に入りを検索</label><input id="favoriteFilter" type="search" placeholder="表示名・英語タグ"></div>
+   <div class="field"><label for="favoriteSort">並べ替え</label><select id="favoriteSort"><option value="label">表示名順</option><option value="tag">英語タグ順</option></select></div>
+   <div class="actions full"><button type="button" class="btn primary" id="addFavoriteFolder">フォルダを追加</button><button type="button" class="btn" id="renameFavoriteFolder">表示中のフォルダ名を変更</button><button type="button" class="btn ghost" id="deleteFavoriteFolder">表示中のフォルダを削除</button></div>
+  </div>
+  <div id="favoriteCollectionsList" aria-live="polite"></div>
+ </section>
+ <div id="favoriteChooser" class="favorite-modal hide" role="dialog" aria-modal="true" aria-labelledby="favoriteChooserTitle">
+  <div class="favorite-modal-card">
+   <h3 id="favoriteChooserTitle">お気に入りに保存</h3><p class="small muted" id="favoriteChooserTag"></p>
+   <label class="small" for="favoriteChooserType">保存先の種類</label><select id="favoriteChooserType"><option value="works">作品・キャラクター</option><option value="attributes">属性・構図</option><option value="uncategorized">未分類</option></select>
+   <label class="small" for="favoriteChooserFolder">保存先フォルダ</label><select id="favoriteChooserFolder"></select>
+   <div id="favoriteChooserLabelWrap" class="field"><label for="favoriteChooserLabel">日本語表示名（任意）</label><input id="favoriteChooserLabel" type="text" maxlength="80" placeholder="例：銀髪"></div>
+   <div class="actions"><button type="button" class="btn primary" id="saveFavoriteChoice">保存</button><button type="button" class="btn ghost" id="closeFavoriteChooser">キャンセル</button><button type="button" class="btn favorite-remove hide" id="removeFavoriteChoice">すべてのフォルダから削除</button></div>
+  </div>
+ </div>
 </div>
 <footer class="footer">内蔵辞書は一般的なタグ候補を収録。Danbooruの全件ではありません。オンライン検索結果は英語タグで、登録済みの語には日本語の意味も表示します。利用件数はDanbooru上の件数です。<br>プロンプトの効き方はモデルや設定により変わります。v8では「共通 / 1人目 / 2人目」を別出力できます。パーツ別の絵柄設定は以前気に入った monobe yuri を初期値に設定しています。<br>NovelAIやDanbooruの公式ツールではない個人用テンプレートです。<br>日本語Danbooru検索は内蔵タグ辞書と同義語による変換で実現。未登録語のみ任意で <a href="https://mymemory.translated.net/doc/spec.php" target="_blank" rel="noopener noreferrer">MyMemory</a> の公開翻訳APIを使用します。オフライン翻訳には限界があります。</footer>
 </div>
@@ -595,13 +626,128 @@ function clearSearchTags(){
  searchAddedTags=emptySearchAdded();
  refresh();renderTagList();byId('copyStatus').textContent='検索から追加したタグを一括解除しました';
 }
-let searchMode='local',displayLimit=60,remoteTags=[],remoteError='',remoteLoading=false,remoteLastQuery='',favoriteTags=[];
+let searchMode='online',displayLimit=60,remoteTags=[],remoteError='',remoteLoading=false,remoteLastQuery='',favoriteTags=[];
 let fetchTimer=null,fetchAbort=null;
 const TAG_DICT_BASE='data/tagdb/';
 let tagDictManifest=null,tagDictWorker=null,tagDictInitPromise=null,tagDictRequest=0,tagDictSearchTimer=null,externalTagResults=[],tagDictError='',tagSupplement={};
 function japaneseForItem(item){return String(item?.jp||'').trim()||tagSupplement[normalize(item?.en||item?.tag||'')]||''}
 try{const saved=JSON.parse(localStorage.getItem('nai_favorite_tags_v2')||'[]');if(Array.isArray(saved))favoriteTags=saved.filter(x=>typeof x==='string').slice(0,200)}catch(e){}
 function saveFavorites(){try{localStorage.setItem('nai_favorite_tags_v2',JSON.stringify(favoriteTags));document.dispatchEvent(new Event('nai:statechanged'))}catch(e){}}
+const FAVORITE_COLLECTIONS_KEY='nai_favorite_collections_v1';
+let favoriteCollections={version:1,works:[],attributes:[],uncategorized:[]};
+let favoriteView=false,favoriteChooserState=null;
+function favoriteId(prefix='fav'){return prefix+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8)}
+function cleanFavoriteEntry(value){if(!value||typeof value!=='object')return null;const tag=String(value.tag||'').trim().replace(/_/g,' ');if(!tag)return null;return {id:String(value.id||favoriteId('tag')),label:String(value.label||tag).slice(0,80),tag:tag.slice(0,300)}}
+function cleanFavoriteFolder(value,kind){if(!value||typeof value!=='object')return null;const name=String(value.name||'').trim().slice(0,40);if(!name)return null;const raw=kind==='works'?value.characters:value.tags;const entries=Array.isArray(raw)?raw.map(cleanFavoriteEntry).filter(Boolean).slice(0,300):[];return {id:String(value.id||favoriteId(kind==='works'?'work':'attr')),name, ...(kind==='works'?{characters:entries}:{tags:entries})}}
+function normalizeFavoriteCollections(value){
+ const result={version:1,works:[],attributes:[],uncategorized:[]};
+ if(!value||typeof value!=='object'||Array.isArray(value))return result;
+ result.works=Array.isArray(value.works)?value.works.map(x=>cleanFavoriteFolder(x,'works')).filter(Boolean).slice(0,50):[];
+ result.attributes=Array.isArray(value.attributes)?value.attributes.map(x=>cleanFavoriteFolder(x,'attributes')).filter(Boolean).slice(0,50):[];
+ result.uncategorized=Array.isArray(value.uncategorized)?value.uncategorized.map(cleanFavoriteEntry).filter(Boolean).slice(0,300):[];
+ return result;
+}
+function mergeFavoriteCollections(base,incoming){
+ const result=normalizeFavoriteCollections(base),next=normalizeFavoriteCollections(incoming);
+ for(const kind of ['works','attributes']){
+  const entriesKey=kind==='works'?'characters':'tags';
+  for(const source of next[kind]){
+   let target=result[kind].find(folder=>folder.id===source.id||normalize(folder.name)===normalize(source.name));
+   if(!target){target={id:source.id,name:source.name,[entriesKey]:[]};result[kind].push(target)}
+   for(const entry of source[entriesKey]){const existing=target[entriesKey].find(item=>normalize(item.tag)===normalize(entry.tag));if(existing){if(existing.label===existing.tag&&entry.label!==entry.tag)existing.label=entry.label}else target[entriesKey].push(entry)}
+  }
+ }
+ for(const entry of next.uncategorized)if(!favoriteEntriesFrom(result).some(item=>normalize(item.tag)===normalize(entry.tag)))result.uncategorized.push(entry);
+ return normalizeFavoriteCollections(result);
+}
+function favoriteEntriesFrom(collections){
+ const out=[];for(const folder of collections.works||[])out.push(...(folder.characters||[]));for(const folder of collections.attributes||[])out.push(...(folder.tags||[]));out.push(...(collections.uncategorized||[]));return out;
+}
+function favoriteFolders(type){return type==='works'?favoriteCollections.works:favoriteCollections.attributes}
+function favoriteEntries(){
+ const out=[];for(const folder of favoriteCollections.works)for(const entry of folder.characters)out.push({...entry,kind:'character',folderId:folder.id,folderName:folder.name});
+ for(const folder of favoriteCollections.attributes)for(const entry of folder.tags)out.push({...entry,kind:'tag',folderId:folder.id,folderName:folder.name});
+ for(const entry of favoriteCollections.uncategorized)out.push({...entry,kind:'uncategorized',folderId:'uncategorized',folderName:'未分類'});return out;
+}
+function syncFavoriteTagsFromCollections(){favoriteTags=[...new Set(favoriteEntries().map(x=>x.tag))].slice(0,200)}
+function persistFavoriteCollections(message=true){
+ const oldCollections=localStorage.getItem(FAVORITE_COLLECTIONS_KEY),oldTags=localStorage.getItem('nai_favorite_tags_v2');
+ try{syncFavoriteTagsFromCollections();localStorage.setItem(FAVORITE_COLLECTIONS_KEY,JSON.stringify(favoriteCollections));localStorage.setItem('nai_favorite_tags_v2',JSON.stringify(favoriteTags));document.dispatchEvent(new Event('nai:statechanged'));if(message)byId('copyStatus').textContent='お気に入りを保存しました';return true}
+ catch(e){try{if(oldCollections===null)localStorage.removeItem(FAVORITE_COLLECTIONS_KEY);else localStorage.setItem(FAVORITE_COLLECTIONS_KEY,oldCollections);if(oldTags===null)localStorage.removeItem('nai_favorite_tags_v2');else localStorage.setItem('nai_favorite_tags_v2',oldTags)}catch(_){ }if(message)byId('copyStatus').textContent='お気に入りを保存できませんでした。既存データは保持しています。';return false}
+}
+function readFavoriteCollections(){
+ try{
+  const raw=localStorage.getItem(FAVORITE_COLLECTIONS_KEY);
+  if(raw){favoriteCollections=normalizeFavoriteCollections(JSON.parse(raw));syncFavoriteTagsFromCollections();return}
+  favoriteCollections=normalizeFavoriteCollections(null);
+  for(const tag of favoriteTags)favoriteCollections.uncategorized.push({id:favoriteId('tag'),label:tag,tag});
+  persistFavoriteCollections(false);
+ }catch(e){favoriteCollections=normalizeFavoriteCollections(null)}
+}
+function favoriteIsSaved(tag){return favoriteTags.some(x=>normalize(x)===normalize(tag))}
+function removeFavoriteEverywhere(tag){
+ const key=normalize(tag);for(const folder of favoriteCollections.works)folder.characters=folder.characters.filter(x=>normalize(x.tag)!==key);for(const folder of favoriteCollections.attributes)folder.tags=folder.tags.filter(x=>normalize(x.tag)!==key);favoriteCollections.uncategorized=favoriteCollections.uncategorized.filter(x=>normalize(x.tag)!==key);return persistFavoriteCollections()
+}
+function folderSelectOptions(select,type,includeNone=false){
+ if(!select)return;select.replaceChildren();if(includeNone){const none=document.createElement('option');none.value='';none.textContent='未選択';select.appendChild(none)}
+ for(const folder of favoriteFolders(type)){const option=document.createElement('option');option.value=folder.id;option.textContent=folder.name;select.appendChild(option)}
+}
+function renderFavoriteFolderControls(){
+ const type=byId('favoriteFolderType')?.value||'works',select=byId('favoriteFolderSelect');folderSelectOptions(select,type);if(select&&!select.value&&select.options.length)select.selectedIndex=0;
+}
+function setFavoriteStatus(text){const el=byId('copyStatus');if(el)el.textContent=text;const tagStatus=byId('tagSearchStatus');if(tagStatus)tagStatus.textContent=text}
+function applySavedCharacter(tag,target){
+ const field=target==='character'?'character':byId('maleMode').value==='girl2'?'girl2Character':'maleCharacter';byId(field).value=tag;refresh();setFavoriteStatus((target==='character'?'キャラ1':field==='girl2Character'?'キャラ2（女の子）':'キャラ2（男性）')+'を差し替えました');
+}
+function copyFavoriteTag(tag){copy(tag,'英語タグ').then(ok=>{if(ok)setFavoriteStatus('「'+tag+'」をコピーしました')})}
+function findFavoriteFolder(type,id){return favoriteFolders(type).find(x=>x.id===id)}
+function moveFavoriteEntry(entry,sourceType,sourceId,targetValue){
+ const source=sourceId==='uncategorized'?favoriteCollections.uncategorized:(sourceType==='works'?findFavoriteFolder('works',sourceId)?.characters:findFavoriteFolder('attributes',sourceId)?.tags);if(!source||!targetValue)return;
+ const [targetType,targetId]=targetValue.split(':');const target=targetType==='works'?findFavoriteFolder('works',targetId):findFavoriteFolder('attributes',targetId);if(!target)return;
+ const i=source.indexOf(entry);if(i<0)return;source.splice(i,1);const list=targetType==='works'?target.characters:target.tags;if(!list.some(x=>normalize(x.tag)===normalize(entry.tag)))list.push(entry);if(persistFavoriteCollections()){renderFavorites();renderTagList();setFavoriteStatus('お気に入りをフォルダ移動しました')}
+}
+function favoriteMoveControl(entry,type,folderId){
+ const select=document.createElement('select');select.className='btn';select.title='移動先';const none=document.createElement('option');none.value='';none.textContent='移動先…';select.appendChild(none);for(const kind of ['works','attributes'])for(const folder of favoriteFolders(kind)){if(kind===type&&folder.id===folderId)continue;const option=document.createElement('option');option.value=kind+':'+folder.id;option.textContent=(kind==='works'?'作品：':'属性：')+folder.name;select.appendChild(option)}
+ const button=document.createElement('button');button.type='button';button.className='btn';button.textContent='移動';button.onclick=()=>moveFavoriteEntry(entry,type,folderId,select.value);return [select,button];
+}
+function addFavoriteFolder(){
+ const type=byId('favoriteFolderType').value,name=byId('favoriteFolderName').value.trim();if(!name){setFavoriteStatus('フォルダ名を入力してください');return}if(favoriteFolders(type).some(x=>x.name===name)){setFavoriteStatus('同名フォルダがあります');return}
+ favoriteFolders(type).push(type==='works'?{id:favoriteId('work'),name,characters:[]}:{id:favoriteId('attr'),name,tags:[]});if(!persistFavoriteCollections())return;byId('favoriteFolderName').value='';renderFavorites();setFavoriteStatus('フォルダ「'+name+'」を追加しました');
+}
+function renameFavoriteFolder(){const type=byId('favoriteFolderType').value,id=byId('favoriteFolderSelect').value,folder=findFavoriteFolder(type,id),name=byId('favoriteFolderName').value.trim();if(!folder){setFavoriteStatus('変更するフォルダを選んでください');return}if(!name){setFavoriteStatus('新しいフォルダ名を入力してください');return}folder.name=name;if(!persistFavoriteCollections())return;byId('favoriteFolderName').value='';renderFavorites();setFavoriteStatus('フォルダ名を変更しました')}
+function deleteFavoriteFolder(){
+ const type=byId('favoriteFolderType').value,id=byId('favoriteFolderSelect').value,folders=favoriteFolders(type),index=folders.findIndex(x=>x.id===id);if(index<0){setFavoriteStatus('削除するフォルダを選んでください');return}const folder=folders[index],entries=type==='works'?folder.characters:folder.tags;if(!confirm('「'+folder.name+'」を削除します。中のタグは未分類へ移します。続けますか？'))return;favoriteCollections.uncategorized.push(...entries);folders.splice(index,1);if(!persistFavoriteCollections())return;renderFavorites();setFavoriteStatus('フォルダを削除し、内容を未分類へ移しました')
+}
+function updateFavoriteChooserFolders(){
+ const type=byId('favoriteChooserType').value,select=byId('favoriteChooserFolder'),wrap=byId('favoriteChooserLabelWrap');select.replaceChildren();wrap.classList.toggle('hide',type==='uncategorized');if(type==='uncategorized')return;
+ for(const folder of favoriteFolders(type)){const option=document.createElement('option');option.value=folder.id;option.textContent=folder.name;select.appendChild(option)}
+}
+function openFavoriteChooser(tag,label=''){
+ favoriteChooserState={tag,label};byId('favoriteChooserTag').textContent=(label?label+' → ':'')+tag;byId('favoriteChooserLabel').value=label||'';byId('favoriteChooserType').value='attributes';updateFavoriteChooserFolders();byId('removeFavoriteChoice').classList.toggle('hide',!favoriteIsSaved(tag));byId('favoriteChooser').classList.remove('hide');
+}
+function closeFavoriteChooser(){byId('favoriteChooser').classList.add('hide');favoriteChooserState=null}
+function saveFavoriteChoice(){
+ if(!favoriteChooserState)return;const {tag}=favoriteChooserState,type=byId('favoriteChooserType').value,label=byId('favoriteChooserLabel').value.trim()||tag,entry={id:favoriteId('tag'),label,tag};
+ if(type==='uncategorized'){if(!favoriteCollections.uncategorized.some(x=>normalize(x.tag)===normalize(tag)))favoriteCollections.uncategorized.push(entry)}
+ else{const folder=findFavoriteFolder(type,byId('favoriteChooserFolder').value);if(!folder){setFavoriteStatus('先に保存先フォルダを作成してください');return}const list=type==='works'?folder.characters:folder.tags;if(!list.some(x=>normalize(x.tag)===normalize(tag)))list.push(entry);else{const old=list.find(x=>normalize(x.tag)===normalize(tag));old.label=label}}
+ if(persistFavoriteCollections()){closeFavoriteChooser();renderFavorites();renderTagList();setFavoriteStatus('お気に入りに保存しました')}
+}
+function renderFavoriteEntry(entry,type,folderId){
+ const row=document.createElement('div');row.className='favorite-entry';const text=document.createElement('div');text.className='favorite-label';text.textContent=entry.label;const en=document.createElement('span');en.className='favorite-en';en.textContent=entry.tag;text.appendChild(en);row.appendChild(text);
+ if(type==='works'){for(const [label,target] of [['キャラ1','character'],['キャラ2','maleCharacter']]){const b=document.createElement('button');b.type='button';b.className='btn';b.textContent=label;b.title=label==='キャラ2'?'現在の男性・女の子モードの入力欄へ適用':'キャラ1の入力欄へ置換';b.onclick=()=>applySavedCharacter(entry.tag,target);row.appendChild(b)}}
+ const cp=document.createElement('button');cp.type='button';cp.className='btn';cp.textContent='コピー';cp.onclick=()=>copyFavoriteTag(entry.tag);row.appendChild(cp);
+ const edit=document.createElement('button');edit.type='button';edit.className='btn';edit.textContent='編集';edit.onclick=()=>{const label=prompt('日本語表示名',entry.label),tag=label===null?null:prompt('英語タグ',entry.tag);if(label===null||tag===null||!tag.trim())return;entry.label=label.trim()||tag.trim();entry.tag=tag.trim().replace(/_/g,' ');persistFavoriteCollections();renderFavorites()};row.appendChild(edit);
+ const [moveSelect,moveButton]=favoriteMoveControl(entry,type,folderId);row.append(moveSelect,moveButton);
+ const del=document.createElement('button');del.type='button';del.className='btn ghost';del.textContent='削除';del.onclick=()=>{if(!confirm('このお気に入りを削除しますか？'))return;const folder=findFavoriteFolder(type,folderId);const list=folder?(type==='works'?folder.characters:folder.tags):folderId==='uncategorized'?favoriteCollections.uncategorized:null;if(list){const i=list.indexOf(entry);if(i>=0)list.splice(i,1);persistFavoriteCollections();renderFavorites();renderTagList()}};row.appendChild(del);
+ return row;
+}
+function renderFavoriteGroup(type,folder){
+ const wrap=document.createElement('div');wrap.className='favorite-folder';const head=document.createElement('div');head.className='favorite-folder-head';const title=document.createElement('strong');title.textContent=folder.name;head.appendChild(title);wrap.appendChild(head);const query=normalize(byId('favoriteFilter')?.value||'');const sort=byId('favoriteSort')?.value||'label';const source=type==='works'?folder.characters:folder.tags;const list=source.filter(entry=>!query||normalize(entry.label).includes(query)||normalize(entry.tag).includes(query)).slice().sort((a,b)=>{const av=normalize(sort==='tag'?a.tag:a.label),bv=normalize(sort==='tag'?b.tag:b.label);return av.localeCompare(bv,'ja')});if(!list.length){const empty=document.createElement('div');empty.className='favorite-empty';empty.textContent=source.length?'検索条件に一致するお気に入りはありません。':type==='works'?'キャラクター未登録':'タグ未登録';wrap.appendChild(empty)}else for(const entry of list)wrap.appendChild(renderFavoriteEntry(entry,type,folder.id));return wrap;
+}
+function renderFavorites(){
+ renderFavoriteFolderControls();const root=byId('favoriteCollectionsList');if(!root)return;root.replaceChildren();for(const [type,label] of [['works','作品'],['attributes','属性・構図']]){const section=document.createElement('section');section.className='favorite-section';const h=document.createElement('h3');h.textContent=label;section.appendChild(h);const folders=favoriteFolders(type);if(!folders.length){const empty=document.createElement('div');empty.className='favorite-empty';empty.textContent='フォルダがありません。上の欄から追加してください。';section.appendChild(empty)}else for(const folder of folders)section.appendChild(renderFavoriteGroup(type,folder));root.appendChild(section)}
+ const section=document.createElement('section');section.className='favorite-section';const h=document.createElement('h3');h.textContent='未分類';section.appendChild(h);const query=normalize(byId('favoriteFilter')?.value||'');const sort=byId('favoriteSort')?.value||'label';const list=favoriteCollections.uncategorized.filter(entry=>!query||normalize(entry.label).includes(query)||normalize(entry.tag).includes(query)).slice().sort((a,b)=>normalize(sort==='tag'?a.tag:a.label).localeCompare(normalize(sort==='tag'?b.tag:b.label),'ja'));if(!list.length){const empty=document.createElement('div');empty.className='favorite-empty';empty.textContent=favoriteCollections.uncategorized.length?'検索条件に一致するお気に入りはありません。':'未分類のタグはありません。';section.appendChild(empty)}else for(const entry of list){const row=renderFavoriteEntry(entry,'attributes','uncategorized');section.appendChild(row)}root.appendChild(section);
+}
 function tagLabel(cat){return {0:'一般',1:'絵師',3:'作品',4:'キャラ',5:'メタ'}[cat]||'タグ'}
 function setTagDictMeta(text, error=false){const el=byId('tagDictMeta');if(!el)return;el.textContent=text;el.style.color=error?'#ffb4b4':''}
 function formatTagDictDate(value){if(!value)return '未生成';const date=new Date(value);return Number.isNaN(date.getTime())?String(value):date.toLocaleString('ja-JP')}
@@ -678,6 +824,8 @@ function requestTagDictionarySearch(){
  },220);
 }
 function modeUI(){
+ byId('tagSearchPanel').classList.toggle('hide',favoriteView);byId('favoritesPanel').classList.toggle('hide',!favoriteView);byId('tagSearchViewTab').classList.toggle('active',!favoriteView);byId('favoriteViewTab').classList.toggle('active',favoriteView);byId('tagSearchViewTab').setAttribute('aria-selected',String(!favoriteView));byId('favoriteViewTab').setAttribute('aria-selected',String(favoriteView));
+ if(favoriteView)return;
  for(const b of document.querySelectorAll('.modebtn'))b.classList.toggle('active',b.dataset.mode===searchMode);
  byId('localCategoryWrap').style.display=searchMode==='local'?'':'none';
  byId('onlineCategoryWrap').style.display=searchMode==='online'?'':'none';
@@ -705,9 +853,9 @@ function addTag(en,source='search'){
  renderTagList();
 }
 function toggleFavorite(tag){
- if(favoriteTags.includes(tag))favoriteTags=favoriteTags.filter(x=>x!==tag);else favoriteTags.unshift(tag);
- saveFavorites();renderTagList();
+ openFavoriteChooser(tag);
 }
+function copyTag(tag){copy(tag,'英語タグ').then(ok=>{if(ok)byId('tagSearchStatus').textContent='「'+tag+'」をコピーしました'})}
 function tagCard(item){
  const {en,cat,count}=item,jp=japaneseForItem(item);
  const wrapper=document.createElement('div');wrapper.className='tagitem';
@@ -717,8 +865,9 @@ function tagCard(item){
  const status=item.verified===false?(item.kind==='related'?'関連候補・実在未確認':'自由プロンプト候補・実在未確認'):(item.kind==='related'?'関連タグ':'');
  sub.className='secondary';sub.textContent=[jp?'英語：'+en:'英語タグ',status,Number.isFinite(count)&&count>0?'使用 '+count.toLocaleString()+'件':'',typeof cat==='number'?tagLabel(cat):''].filter(Boolean).join(' · ');
  left.append(a,sub);const plus=document.createElement('span');plus.className='plus';plus.textContent=active?'✓':'＋';main.append(left,plus);main.addEventListener('click',()=>addTag(en,'search'));
- const fav=document.createElement('button');fav.className='favbtn'+(favoriteTags.includes(en)?' favorite':'');fav.type='button';fav.title='お気に入りに追加・解除';fav.setAttribute('aria-label',en+'をお気に入り');fav.textContent=favoriteTags.includes(en)?'★':'☆';fav.addEventListener('click',()=>toggleFavorite(en));
- wrapper.append(main,fav);return wrapper;
+ const copyButton=document.createElement('button');copyButton.type='button';copyButton.className='tag-copy';copyButton.textContent='コピー';copyButton.title='英語タグだけをコピー';copyButton.addEventListener('click',event=>{event.stopPropagation();copyTag(en)});
+ const fav=document.createElement('button');fav.className='favbtn'+(favoriteIsSaved(en)?' favorite':'');fav.type='button';fav.title='保存先フォルダを選ぶ';fav.setAttribute('aria-label',en+'をお気に入りに保存');fav.textContent=favoriteIsSaved(en)?'★':'☆';fav.addEventListener('click',event=>{event.stopPropagation();toggleFavorite(en)});
+ wrapper.append(main,copyButton,fav);return wrapper;
 }
 function getLocalResults(){
  const q=normalize(byId('tagQuery').value),cat=byId('tagCategory').value,words=q.split(' ').filter(Boolean);
@@ -745,6 +894,7 @@ function getLocalResults(){
  return tagRanking.dedupe(items,{preferGeneral:isJapanese(q)&&cat==='all'});
 }
 function renderTagList(){
+ if(favoriteView){renderFavorites();return}
  const el=byId('tagResults');el.innerHTML='';const q=normalize(byId('tagQuery').value);
  let items=[];
  if(searchMode==='local')items=getLocalResults();
@@ -868,7 +1018,9 @@ function resetTagDictionary(){
  if(tagDictWorker){tagDictWorker.terminate();tagDictWorker=null}
  tagDictManifest=null;tagDictInitPromise=null;tagDictError='';tagSupplement={};externalTagResults=[];setTagDictMeta('辞書状態を確認しています…');requestTagDictionarySearch();
 }
-function setMode(mode){searchMode=mode;displayLimit=60;remoteError='';modeUI();if(mode==='online')scheduleOnlineSearch();else{if(fetchAbort)fetchAbort.abort();remoteLoading=false;renderTagList();requestTagDictionarySearch()}}
+function showFavoritesView(){favoriteView=true;if(fetchAbort){fetchAbort.abort();fetchAbort=null}remoteLoading=false;modeUI();renderFavorites()}
+function showTagSearchView(){favoriteView=false;if(searchMode==='saved')searchMode='online';modeUI();renderTagList();if(searchMode==='online'&&byId('tagQuery').value.trim())scheduleOnlineSearch()}
+function setMode(mode){if(mode==='saved'){showFavoritesView();return}favoriteView=false;searchMode=mode;displayLimit=60;remoteError='';modeUI();if(mode==='online')scheduleOnlineSearch();else{if(fetchAbort)fetchAbort.abort();remoteLoading=false;renderTagList();requestTagDictionarySearch()}}
 for(const b of document.querySelectorAll('.modebtn'))b.addEventListener('click',()=>setMode(b.dataset.mode));
 byId('loadMoreTags').addEventListener('click',()=>{displayLimit+=60;renderTagList()});
 byId('addTypedTag').addEventListener('click',()=>addTag(byId('tagQuery').value));
@@ -877,6 +1029,11 @@ byId('onlineCategory').addEventListener('change',renderTagList);
 byId('autoTranslate').addEventListener('change',()=>{if(searchMode==='online')scheduleOnlineSearch()});
 byId('tagDestination').addEventListener('change',renderTagList);
 byId('reloadTagDict').addEventListener('click',resetTagDictionary);
+byId('tagSearchViewTab').onclick=showTagSearchView;byId('favoriteViewTab').onclick=showFavoritesView;
+byId('favoriteFolderType').addEventListener('change',renderFavorites);
+byId('favoriteFilter').addEventListener('input',renderFavorites);byId('favoriteSort').addEventListener('change',renderFavorites);
+byId('addFavoriteFolder').onclick=addFavoriteFolder;byId('renameFavoriteFolder').onclick=renameFavoriteFolder;byId('deleteFavoriteFolder').onclick=deleteFavoriteFolder;
+byId('favoriteChooserType').addEventListener('change',updateFavoriteChooserFolders);byId('saveFavoriteChoice').onclick=saveFavoriteChoice;byId('closeFavoriteChooser').onclick=closeFavoriteChooser;byId('removeFavoriteChoice').onclick=()=>{if(favoriteChooserState&&removeFavoriteEverywhere(favoriteChooserState.tag)){closeFavoriteChooser();renderFavorites();renderTagList();setFavoriteStatus('お気に入りから削除しました')}};
 
 const stateIds=['character','outfit','pose','scene','expression','camera','viewMode','maleMode','maleCharacter','maleAppearance','maleOutfit','maleAction','maleExtra','girl2Character','girl2Appearance','girl2Outfit','girl2Action','girl2Extra','pasteTags','style','extras','femaleExtras','negative','useQuality','useSolo','stylePartsMode','styleDirectMode','styleDirectTags','styleArtistOther',...partIds];
 function saveState(){try{const data={};for(const id of stateIds)data[id]=byId(id).type==='checkbox'?byId(id).checked:byId(id).value;data.extraTags=extraTags;data.femaleTags=femaleTags;data.maleTags=maleTags;data.girl2Tags=girl2Tags;data.searchAddedTags=searchAddedTags;data.panelCollapse=panelCollapseState();localStorage.setItem('nai_prompt_studio_v13',JSON.stringify(data));document.dispatchEvent(new Event('nai:statechanged'))}catch(e){}}
@@ -1034,8 +1191,21 @@ byId('togglePasteSettings').addEventListener('click',()=>{byId('pasteSettingsAre
 byId('applyPastedSettings').addEventListener('click',loadFromText);
 byId('jumpSnapshots').onclick=()=>byId('snapshotPanel').scrollIntoView({behavior:'smooth',block:'start'});
 
-function exportAll(){const state=captureSettings();const payload={format:'NAI-Prompt-Studio-Settings',version:13,savedAt:new Date().toISOString(),state,customLooks,favoriteTags,savedSnapshots,draftImageData};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='NAI_Prompt_Studio_backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);byId('copyStatus').textContent='バックアップを書き出しました'}
-async function importAll(file){try{if(!file||file.size>12*1024*1024)throw Error('ファイルが大きすぎます');const payload=JSON.parse(await file.text());if(payload.format!=='NAI-Prompt-Studio-Settings'||!payload.state)throw Error('バックアップファイルではありません');const data=payload.state;for(const id of stateIds){if(!(id in data))continue;const el=byId(id);if(el.type==='checkbox')el.checked=Boolean(data[id]);else if(el.tagName!=='SELECT'||[...el.options].some(o=>o.value===data[id]))el.value=String(data[id]).slice(0,5000)}extraTags=Array.isArray(data.extraTags)?data.extraTags.filter(x=>typeof x==='string').slice(0,40):[];femaleTags=Array.isArray(data.femaleTags)?data.femaleTags.filter(x=>typeof x==='string').slice(0,40):[];maleTags=Array.isArray(data.maleTags)?data.maleTags.filter(x=>typeof x==='string').slice(0,40):[];girl2Tags=Array.isArray(data.girl2Tags)?data.girl2Tags.filter(x=>typeof x==='string').slice(0,40):[];searchAddedTags=normalizeSearchAdded(data.searchAddedTags);if(payload.customLooks&&typeof payload.customLooks==='object'&&!Array.isArray(payload.customLooks)){const previous=customLooks;customLooks=normalizeCustomLooks(payload.customLooks);if(!persistCustomLooks())customLooks=previous}if(Array.isArray(payload.favoriteTags)){favoriteTags=payload.favoriteTags.filter(x=>typeof x==='string').slice(0,200);saveFavorites()}if(Array.isArray(payload.savedSnapshots)){const previous=savedSnapshots;savedSnapshots=validateSnapshots(payload.savedSnapshots);if(!persistSnapshots())savedSnapshots=previous;renderSnapshots()}setDraftImage(isSavedImage(payload.draftImageData)?payload.draftImageData:'');lastStyleSnapshot=styleFields();refresh();renderCustomLooks();byId('copyStatus').textContent=customLooksStorageError?'絵柄保存は容量不足のため復元されませんでした。既存データは維持されています。':snapshotStorageError?'保存セットは容量不足のため復元されませんでした。既存データは維持されています。':'設定を読み込みました'}catch(e){byId('copyStatus').textContent='読み込みに失敗: '+e.message}finally{byId('importSettingsFile').value=''}}
+function exportAll(){const state=captureSettings();const payload={format:'NAI-Prompt-Studio-Settings',version:14,savedAt:new Date().toISOString(),state,customLooks,favoriteTags,favoriteCollections,savedSnapshots,draftImageData};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='NAI_Prompt_Studio_backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);byId('copyStatus').textContent='バックアップを書き出しました'}
+async function importAll(file){try{
+ if(!file||file.size>12*1024*1024)throw Error('ファイルが大きすぎます');
+ const payload=JSON.parse(await file.text());if(payload.format!=='NAI-Prompt-Studio-Settings'||!payload.state)throw Error('バックアップファイルではありません');
+ const data=payload.state;for(const id of stateIds){if(!(id in data))continue;const el=byId(id);if(el.type==='checkbox')el.checked=Boolean(data[id]);else if(el.tagName!=='SELECT'||[...el.options].some(o=>o.value===data[id]))el.value=String(data[id]).slice(0,5000)}
+ extraTags=Array.isArray(data.extraTags)?data.extraTags.filter(x=>typeof x==='string').slice(0,40):[];femaleTags=Array.isArray(data.femaleTags)?data.femaleTags.filter(x=>typeof x==='string').slice(0,40):[];maleTags=Array.isArray(data.maleTags)?data.maleTags.filter(x=>typeof x==='string').slice(0,40):[];girl2Tags=Array.isArray(data.girl2Tags)?data.girl2Tags.filter(x=>typeof x==='string').slice(0,40):[];searchAddedTags=normalizeSearchAdded(data.searchAddedTags);
+ if(payload.customLooks&&typeof payload.customLooks==='object'&&!Array.isArray(payload.customLooks)){const previous=customLooks;customLooks=normalizeCustomLooks(payload.customLooks);if(!persistCustomLooks())customLooks=previous}
+ if(Array.isArray(payload.favoriteTags)){
+  const importedTags=payload.favoriteTags.filter(x=>typeof x==='string').slice(0,200);favoriteTags=importedTags;
+  if(!payload.favoriteCollections){const known=new Set(favoriteEntries().map(x=>normalize(x.tag)));for(const tag of importedTags)if(!known.has(normalize(tag)))favoriteCollections.uncategorized.push({id:favoriteId('tag'),label:tag,tag});persistFavoriteCollections(false)}else saveFavorites()
+ }
+ if(payload.favoriteCollections&&typeof payload.favoriteCollections==='object'&&!Array.isArray(payload.favoriteCollections)){const previous=favoriteCollections;favoriteCollections=normalizeFavoriteCollections(payload.favoriteCollections);if(!persistFavoriteCollections(false))favoriteCollections=previous;renderFavorites()}
+ if(Array.isArray(payload.savedSnapshots)){const previous=savedSnapshots;savedSnapshots=validateSnapshots(payload.savedSnapshots);if(!persistSnapshots())savedSnapshots=previous;renderSnapshots()}
+ setDraftImage(isSavedImage(payload.draftImageData)?payload.draftImageData:'');lastStyleSnapshot=styleFields();refresh();renderCustomLooks();renderFavorites();byId('copyStatus').textContent=customLooksStorageError?'絵柄保存は容量不足のため復元されませんでした。既存の保存データは維持されています。':snapshotStorageError?'保存セットは容量不足のため復元されませんでした。既存の保存データは維持されています。':'設定を読み込みました'
+ }catch(e){byId('copyStatus').textContent='読み込みに失敗: '+e.message}finally{byId('importSettingsFile').value=''}}
 byId('exportSettings').onclick=exportAll;
 byId('importSettingsBtn').onclick=()=>byId('importSettingsFile').click();
 byId('importSettingsFile').onchange=e=>importAll(e.target.files?.[0]);
@@ -1066,7 +1236,7 @@ byId('commitPastedTags').addEventListener('click',()=>{
  for(const t of tags){if(!extraTags.some(x=>normalize(x)===normalize(t))){extraTags.push(t);n++}}
  byId('pasteTags').value='';refresh();byId('copyStatus').textContent=n+'件のタグを個別追加しました';
 });
-function tab(which){const isBuild=which==='build';byId('buildArea').classList.toggle('hide',!isBuild);byId('tagsArea').classList.toggle('hide',isBuild);byId('tabBuild').classList.toggle('active',isBuild);byId('tabTags').classList.toggle('active',!isBuild);if(!isBuild)renderTagList();window.scrollTo({top:0,behavior:'instant'})}
+function tab(which){const isBuild=which==='build';byId('buildArea').classList.toggle('hide',!isBuild);byId('tagsArea').classList.toggle('hide',isBuild);byId('tabBuild').classList.toggle('active',isBuild);byId('tabTags').classList.toggle('active',!isBuild);if(!isBuild){showTagSearchView();searchMode='online';modeUI();if(byId('tagQuery').value.trim())scheduleOnlineSearch()}window.scrollTo({top:0,behavior:'instant'})}
 byId('tabBuild').onclick=()=>tab('build');byId('tabTags').onclick=()=>tab('tags');byId('goTags').onclick=()=>tab('tags');byId('returnBuild').onclick=()=>tab('build');
 byId('tagQuery').addEventListener('input',()=>{displayLimit=60;if(searchMode==='online')scheduleOnlineSearch();else{renderTagList();requestTagDictionarySearch()}});byId('tagCategory').addEventListener('change',()=>{displayLimit=60;renderTagList();requestTagDictionarySearch()});
 byId('clearSearchTags').onclick=clearSearchTags;
@@ -1209,7 +1379,7 @@ byId('stylePartsMode').addEventListener('change',refresh);
 byId('undoStyle').addEventListener('click',()=>{if(!prevLook)return;const now=styleFields();for(const [id,value] of Object.entries(prevLook))byId(id).value=value;prevLook=now;lastStyleSnapshot=styleFields();refresh()});
 byId('copyStyleOnly').addEventListener('click',()=>copy(buildStyle(),'絵柄タグ'));
  setupCollapsiblePanels();
-loadState();readCustomLooks();readSnapshots();renderCustomLooks();renderSnapshots();lastStyleSnapshot=styleFields();refresh();modeUI();renderTagList();setTagDictMeta('日本語辞書の状態を確認しています…');ensureTagDictionary();
+loadState();readCustomLooks();readSnapshots();readFavoriteCollections();renderCustomLooks();renderSnapshots();lastStyleSnapshot=styleFields();refresh();modeUI();renderTagList();renderFavorites();setTagDictMeta('日本語辞書の状態を確認しています…');ensureTagDictionary();
 
 </script>
 <script src="./firebase-config.js"></script>
