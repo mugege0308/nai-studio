@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "source": "NAI Studio maintained synonym map",
+  "entries": [
+    {"terms": ["銀髪", "シルバーヘア", "銀色の髪", "silver hair"], "tag": "silver hair", "jp": "銀髪", "related": ["white hair", "grey hair"]},
+    {"terms": ["編み込み", "三つ編み", "みつあみ", "braid"], "tag": "braid", "jp": "編み込み", "related": ["braided hair", "french braid"]},
+    {"terms": ["前髪", "ぱっつん", "bangs"], "tag": "bangs", "jp": "前髪", "related": ["blunt bangs", "side bangs"]},
+    {"terms": ["横顔", "横向き", "profile"], "tag": "profile", "jp": "横顔", "related": ["three-quarter view", "side view"]},
+    {"terms": ["上半身", "腰上", "upper body"], "tag": "upper body", "jp": "上半身", "related": ["cowboy shot", "medium shot"]},
+    {"terms": ["全身", "全身絵", "full body"], "tag": "full body", "jp": "全身", "related": ["wide shot", "full shot"]},
+    {"terms": ["顔アップ", "顔のアップ", "close-up"], "tag": "close-up", "jp": "顔アップ", "related": ["portrait", "face focus"]},
+    {"terms": ["黒髪", "black hair"], "tag": "black hair", "jp": "黒髪", "related": ["dark hair"]},
+    {"terms": ["金髪", "blonde hair"], "tag": "blonde hair", "jp": "金髪", "related": ["long blonde hair"]},
+    {"terms": ["青い目", "青目", "碧眼", "blue eyes"], "tag": "blue eyes", "jp": "青い目", "related": ["aqua eyes"]},
+    {"terms": ["笑顔", "微笑み", "smile"], "tag": "smile", "jp": "笑顔", "related": ["gentle smile", "happy"]},
+    {"terms": ["赤面", "照れ", "blush"], "tag": "blush", "jp": "赤面", "related": ["embarrassed", "shy"]},
+    {"terms": ["制服", "school uniform"], "tag": "school uniform", "jp": "制服", "related": ["school blazer", "serafuku"]},
+    {"terms": ["私服", "部屋着", "casual clothes"], "tag": "casual clothes", "jp": "私服", "related": ["casual wear", "loungewear"]}
+  ]
+}

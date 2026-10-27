@@ -309,21 +309,23 @@
 <div id="tagsArea" class="hide">
  <section class="panel tagsearch">
    <div><h2>タグを探して追加する <span class="pill">v13.0</span></h2><p class="small muted">内蔵辞書もDanbooruも日本語・英語で検索。結果の英語タグをそのままプロンプトに追加できます。</p></div>
-   <div class="modebar" role="group" aria-label="タグの検索元"><button type="button" class="modebtn active" data-mode="local">内蔵辞書（オフライン）</button><button type="button" class="modebtn" data-mode="online">Danbooru検索（通信）</button><button type="button" class="modebtn" data-mode="saved">★ お気に入り</button></div>
+   <div class="modebar" role="group" aria-label="タグの検索元"><button type="button" class="modebtn active" data-mode="local">内蔵＋日本語辞書</button><button type="button" class="modebtn" data-mode="online">Danbooru検索（通信）</button><button type="button" class="modebtn" data-mode="saved">★ お気に入り</button></div>
    <input id="tagQuery" class="query" type="search" placeholder="例: 編み込み / 横顔 / 黒髪 / braid / beach" autocomplete="off">
    <div class="formgrid searchopts">
      <div class="field" id="localCategoryWrap"><label for="tagCategory">カテゴリ</label><select id="tagCategory"></select></div>
      <div class="field" id="onlineCategoryWrap" style="display:none"><label for="onlineCategory">オンラインの分類</label><select id="onlineCategory"><option value="">すべて</option><option value="0">一般タグ</option><option value="4">キャラクター</option><option value="3">作品名</option><option value="1">絵師</option><option value="5">メタ</option></select></div>
      <div class="field"><label for="tagDestination">追加先</label><select id="tagDestination"><option value="positive">共通プロンプト</option><option value="female">女の子個別</option><option value="male">2人目：男性</option><option value="girl2">2人目：女の子</option><option value="negative">UC（除外）</option></select></div>
    </div>
-   <p class="small muted" id="searchGuide">日本語の意味から検索できます。インターネット接続は不要です。</p>
+   <p class="small muted" id="searchGuide">日本語の意味から検索できます。内蔵辞書は通信不要で、上流辞書は必要なカテゴリだけ遅延読み込みします。</p>
    <label class="toggle" id="autoTranslateWrap" style="display:none"><input type="checkbox" id="autoTranslate" checked>辞書にない日本語は自動翻訳して検索（外部サービス）</label>
    <div id="searchInterpretation" class="small muted" style="display:none"></div>
    <div class="outheader"><span class="septext">候補一覧</span><span class="count" id="resultCount"></span></div>
    <div id="tagResults" class="tagresults" aria-live="polite"></div>
    <div class="actions"><button type="button" class="btn" id="loadMoreTags" style="display:none">さらに表示</button><button type="button" class="btn ghost" id="addTypedTag" style="display:none">入力した英語タグを追加</button><button type="button" class="btn ghost" id="retryOnline" style="display:none">オンライン検索を再試行</button></div>
    <p class="small muted" id="tagSearchStatus" role="status"></p>
-   <p class="note">Danbooru検索は公開APIへ英語の検索語を送ります。日本語はまず内蔵辞書で英語に変換し、辞書にない場合のみ（自動翻訳がONなら）MyMemory翻訳APIにも検索語を送ります。ブラウザの通信制限（CORS）などで利用できない場合があります。<strong>内蔵辞書はオフラインでも動きます。</strong> 検索結果がNAI V5で必ず有効とは限りません。</p>
+   <p class="small muted" id="tagDictMeta" role="status"></p>
+   <div class="actions"><button type="button" class="btn ghost" id="reloadTagDict">日本語辞書の状態を再確認</button></div>
+   <p class="note">上流辞書はPYU224/tagdb-updaterの公開タグデータをカテゴリ別に遅延読み込みします。日本語・英語の完全一致、同義語、部分一致、関連語の順で候補を並べます。更新日時や取得エラーは上の状態表示で確認できます。出典・ライセンスはdata/tagdb/LICENSE-ATTRIBUTION.mdを参照してください。Danbooru検索は公開APIへ英語の検索語を送ります。ブラウザの通信制限（CORS）などで利用できない場合があります。</p>
    <div class="actions"><button id="returnBuild" class="btn primary" type="button">← 作成画面に戻る</button></div>
  </section>
 </div>
@@ -412,6 +414,7 @@ const byId=id=>document.getElementById(id);
 let extraTags=[],femaleTags=[],maleTags=[],girl2Tags=[];
 for(const key of Object.keys(opts)){const el=byId(key);for(const [value,label] of opts[key]){const o=document.createElement('option');o.value=value;o.textContent=label;el.appendChild(o)}}
 for(const [value,label] of categories){const o=document.createElement('option');o.value=value;o.textContent=label;byId('tagCategory').appendChild(o)}
+for(const [value,label] of [['upstream:0','上流：一般タグ'],['upstream:4','上流：キャラクター'],['upstream:3','上流：作品名'],['upstream:1','上流：絵師'],['upstream:5','上流：メタ']]){const o=document.createElement('option');o.value=value;o.textContent=label;byId('tagCategory').appendChild(o)}
 const povModes={
  normal:{count:'',tags:''},
  povhand:{count:'1girl, solo focus',tags:'first-person pov, pov hands, one hand reaching from bottom foreground, girl looking at viewer, male character outside frame, female focus'},
@@ -531,16 +534,84 @@ function renderChips(){
 const normalize=s=>String(s).toLowerCase().normalize('NFKC').replace(/[_\-]/g,' ').replace(/\s+/g,' ').trim();
 let searchMode='local',displayLimit=60,remoteTags=[],remoteError='',remoteLoading=false,remoteLastQuery='',favoriteTags=[];
 let fetchTimer=null,fetchAbort=null;
+const TAG_DICT_BASE='data/tagdb/';
+let tagDictManifest=null,tagDictWorker=null,tagDictInitPromise=null,tagDictRequest=0,tagDictSearchTimer=null,externalTagResults=[],tagDictError='';
 try{const saved=JSON.parse(localStorage.getItem('nai_favorite_tags_v2')||'[]');if(Array.isArray(saved))favoriteTags=saved.filter(x=>typeof x==='string').slice(0,200)}catch(e){}
 function saveFavorites(){try{localStorage.setItem('nai_favorite_tags_v2',JSON.stringify(favoriteTags));document.dispatchEvent(new Event('nai:statechanged'))}catch(e){}}
 function tagLabel(cat){return {0:'一般',1:'絵師',3:'作品',4:'キャラ',5:'メタ'}[cat]||'タグ'}
+function setTagDictMeta(text, error=false){const el=byId('tagDictMeta');if(!el)return;el.textContent=text;el.style.color=error?'#ffb4b4':''}
+function formatTagDictDate(value){if(!value)return '未生成';const date=new Date(value);return Number.isNaN(date.getTime())?String(value):date.toLocaleString('ja-JP')}
+async function ensureTagDictionary(){
+ if(tagDictWorker)return true;
+ if(tagDictInitPromise)return tagDictInitPromise;
+ tagDictInitPromise=(async()=>{
+  const response=await fetch(TAG_DICT_BASE+'manifest.json',{cache:'no-cache'});
+  if(!response.ok)throw new Error('辞書manifest HTTP '+response.status);
+  const manifest=await response.json();
+  if(manifest?.schemaVersion!==1)throw new Error('辞書manifestのバージョンが未対応です');
+  tagDictManifest=manifest;
+  if(manifest.status!=='ready'||!manifest.total){
+   setTagDictMeta('上流日本語辞書はまだ生成されていません。GitHub Actionsを手動実行すると利用できます。');
+   return false;
+  }
+  const synonymsResponse=await fetch(TAG_DICT_BASE+(manifest.synonyms||'synonyms.json'),{cache:'force-cache'});
+  const synonyms=synonymsResponse.ok?await synonymsResponse.json():{entries:[]};
+  const worker=new Worker('tag-search-worker.js');
+  tagDictWorker=worker;
+  worker.addEventListener('message',event=>{
+   const message=event.data||{};
+   if(message.type==='result'&&message.id===tagDictRequest){
+    externalTagResults=(message.results||[]).map(item=>({en:item.tag,jp:item.jp||'',cat:Number(item.category),count:Number(item.count)||0,score:Number(item.score)||0,kind:item.kind||'partial'}));
+    byId('tagSearchStatus').textContent=externalTagResults.length+'件（上流辞書、完全一致・同義語・部分一致・関連語順）';
+    renderTagList();
+   }else if(message.type==='error'&&message.id===tagDictRequest){
+    tagDictError=message.message||'辞書検索に失敗しました';
+    byId('tagSearchStatus').textContent=tagDictError+'（内蔵辞書は継続利用できます）';
+    externalTagResults=[];
+    renderTagList();
+   }
+  });
+  await new Promise((resolve,reject)=>{
+   const timeout=setTimeout(()=>reject(new Error('辞書Workerの初期化がタイムアウトしました')),5000);
+   worker.addEventListener('message',event=>{
+    if(event.data?.type==='ready'){clearTimeout(timeout);resolve()}
+   },{once:true});
+   worker.addEventListener('error',event=>{clearTimeout(timeout);reject(new Error(event.message||'辞書Workerの起動に失敗しました'))},{once:true});
+   worker.postMessage({type:'init',basePath:TAG_DICT_BASE,manifest,synonyms});
+  });
+  setTagDictMeta('上流辞書 '+Number(manifest.total).toLocaleString()+'件 / 翻訳 '+Number(manifest.translated||0).toLocaleString()+'件 / 最終更新 '+formatTagDictDate(manifest.generatedAt)+' / 出典 PYU224/tagdb-updater（MIT表記・上流データの注意事項あり）');
+  return true;
+ })().catch(error=>{
+  if(tagDictWorker){tagDictWorker.terminate();tagDictWorker=null}
+  tagDictError=String(error?.message||'辞書の取得に失敗しました');
+  setTagDictMeta('日本語辞書の読み込みエラー：'+tagDictError+'（内蔵辞書は継続利用できます）',true);
+  return false;
+ }).finally(()=>{tagDictInitPromise=null});
+ return tagDictInitPromise;
+}
+function externalCategoryMatches(category){
+ return category==='all'||category.startsWith('upstream:');
+}
+function requestTagDictionarySearch(){
+ clearTimeout(tagDictSearchTimer);
+ const query=byId('tagQuery').value.trim(),category=byId('tagCategory').value;
+ externalTagResults=[];
+ if(searchMode!=='local'||normalize(query).length<2||!externalCategoryMatches(category)){renderTagList();return}
+ const requestId=++tagDictRequest;
+ tagDictSearchTimer=setTimeout(async()=>{
+  const ready=await ensureTagDictionary();
+  if(!ready||requestId!==tagDictRequest||!tagDictWorker)return;
+  byId('tagSearchStatus').textContent='上流辞書を検索しています…';
+  tagDictWorker.postMessage({type:'search',id:requestId,query,category});
+ },220);
+}
 function modeUI(){
  for(const b of document.querySelectorAll('.modebtn'))b.classList.toggle('active',b.dataset.mode===searchMode);
  byId('localCategoryWrap').style.display=searchMode==='local'?'':'none';
  byId('onlineCategoryWrap').style.display=searchMode==='online'?'':'none';
  byId('autoTranslateWrap').style.display=searchMode==='online'?'':'none';
  if(searchMode!=='online')byId('searchInterpretation').style.display='none';
- const note={local:'日本語の意味から検索できます。通信不要でいつでも使えます。',online:'日本語でも英語でも検索できます。日本語は英語タグに変換してDanbooruに照会します。',saved:'星を付けたタグをここで再利用できます。'};
+ const note={local:'日本語・英語で検索できます。内蔵候補に加えて上流辞書を必要なカテゴリだけ読み込みます。',online:'日本語でも英語でも検索できます。日本語は英語タグに変換してDanbooruに照会します。',saved:'星を付けたタグをここで再利用できます。'};
  byId('searchGuide').textContent=note[searchMode];
  byId('retryOnline').style.display='none';
 }
@@ -575,13 +646,26 @@ function tagCard(item){
 }
 function getLocalResults(){
  const q=normalize(byId('tagQuery').value),cat=byId('tagCategory').value,words=q.split(' ').filter(Boolean);
+ if(cat.startsWith('upstream:'))return externalTagResults.slice();
  const scored=allTags.filter(([c,en,jp])=>(cat==='all'||c===cat)).map(([c,en,jp])=>{
   const name=normalize(en),translated=normalize(jp),text=name+' '+translated;
   if(words.some(word=>!text.includes(word)))return null;
-  let score=0;if(q){if(name===q||translated===q)score+=100;else if(name.startsWith(q)||translated.startsWith(q))score+=50;else if(name.includes(q)||translated.includes(q))score+=12;}
-  return {en,jp,cat:c,score};
+  let score=0;
+  if(q){if(name===q)score=1000;else if(translated===q)score=980;else if(name.startsWith(q)||translated.startsWith(q))score=760;else if(name.includes(q)||translated.includes(q))score=560;}
+  return {en,jp,cat:c,score,kind:score>=980?'exact':'partial'};
  }).filter(Boolean);
- scored.sort((a,b)=>b.score-a.score||a.en.localeCompare(b.en));return scored;
+ if(q&&typeof jpTagSynonyms!=='undefined'){
+  for(const [jp,terms] of jpTagSynonyms){
+   if(normalize(jp)!==q)continue;
+   for(const [index,en] of terms.entries()){
+    const found=typeof localByEnglish!=='undefined'?localByEnglish.get(normalize(en)):null;
+    scored.push({en,jp:found?.[2]||jp,cat:found?.[0]||'details',score:820-index*3,kind:'synonym'});
+   }
+  }
+ }
+ const combined=new Map();
+ for(const item of [...scored,...(cat==='all'?externalTagResults:[])]){const key=normalize(item.en);if(!combined.has(key)||combined.get(key).score<item.score)combined.set(key,item)}
+ return [...combined.values()].sort((a,b)=>b.score-a.score||a.en.localeCompare(b.en));
 }
 function renderTagList(){
  const el=byId('tagResults');el.innerHTML='';const q=normalize(byId('tagQuery').value);
@@ -697,7 +781,11 @@ function scheduleOnlineSearch(){
  clearTimeout(fetchTimer);if(fetchAbort){fetchAbort.abort();fetchAbort=null}
  fetchTimer=setTimeout(()=>{if(searchMode==='online')runOnlineSearch()},800)
 }
-function setMode(mode){searchMode=mode;displayLimit=60;remoteError='';modeUI();if(mode==='online')scheduleOnlineSearch();else{if(fetchAbort)fetchAbort.abort();remoteLoading=false;renderTagList()}}
+function resetTagDictionary(){
+ if(tagDictWorker){tagDictWorker.terminate();tagDictWorker=null}
+ tagDictManifest=null;tagDictInitPromise=null;tagDictError='';externalTagResults=[];setTagDictMeta('辞書状態を確認しています…');requestTagDictionarySearch();
+}
+function setMode(mode){searchMode=mode;displayLimit=60;remoteError='';modeUI();if(mode==='online')scheduleOnlineSearch();else{if(fetchAbort)fetchAbort.abort();remoteLoading=false;renderTagList();requestTagDictionarySearch()}}
 for(const b of document.querySelectorAll('.modebtn'))b.addEventListener('click',()=>setMode(b.dataset.mode));
 byId('loadMoreTags').addEventListener('click',()=>{displayLimit+=60;renderTagList()});
 byId('addTypedTag').addEventListener('click',()=>addTag(byId('tagQuery').value));
@@ -705,6 +793,7 @@ byId('retryOnline').addEventListener('click',()=>{remoteError='';runOnlineSearch
 byId('onlineCategory').addEventListener('change',renderTagList);
 byId('autoTranslate').addEventListener('change',()=>{if(searchMode==='online')scheduleOnlineSearch()});
 byId('tagDestination').addEventListener('change',renderTagList);
+byId('reloadTagDict').addEventListener('click',resetTagDictionary);
 
 const stateIds=['character','outfit','pose','scene','expression','camera','viewMode','maleMode','maleCharacter','maleAppearance','maleOutfit','maleAction','maleExtra','girl2Character','girl2Appearance','girl2Outfit','girl2Action','girl2Extra','pasteTags','style','extras','femaleExtras','negative','useQuality','useSolo','stylePartsMode','styleDirectMode','styleDirectTags','styleArtistOther',...partIds];
 function saveState(){try{const data={};for(const id of stateIds)data[id]=byId(id).type==='checkbox'?byId(id).checked:byId(id).value;data.extraTags=extraTags;data.femaleTags=femaleTags;data.maleTags=maleTags;data.girl2Tags=girl2Tags;data.panelCollapse=panelCollapseState();localStorage.setItem('nai_prompt_studio_v13',JSON.stringify(data));document.dispatchEvent(new Event('nai:statechanged'))}catch(e){}}
@@ -887,7 +976,7 @@ byId('commitPastedTags').addEventListener('click',()=>{
 });
 function tab(which){const isBuild=which==='build';byId('buildArea').classList.toggle('hide',!isBuild);byId('tagsArea').classList.toggle('hide',isBuild);byId('tabBuild').classList.toggle('active',isBuild);byId('tabTags').classList.toggle('active',!isBuild);if(!isBuild)renderTagList();window.scrollTo({top:0,behavior:'instant'})}
 byId('tabBuild').onclick=()=>tab('build');byId('tabTags').onclick=()=>tab('tags');byId('goTags').onclick=()=>tab('tags');byId('returnBuild').onclick=()=>tab('build');
-byId('tagQuery').addEventListener('input',()=>{displayLimit=60;if(searchMode==='online')scheduleOnlineSearch();else renderTagList()});byId('tagCategory').addEventListener('change',()=>{displayLimit=60;renderTagList()});
+byId('tagQuery').addEventListener('input',()=>{displayLimit=60;if(searchMode==='online')scheduleOnlineSearch();else{renderTagList();requestTagDictionarySearch()}});byId('tagCategory').addEventListener('change',()=>{displayLimit=60;renderTagList();requestTagDictionarySearch()});
 byId('clearTags').onclick=()=>{extraTags=[];femaleTags=[];maleTags=[];girl2Tags=[];refresh()};
 byId('jumpMale').onclick=()=>{byId('malePanel').scrollIntoView({behavior:'smooth',block:'start'})};
 byId('jumpExtra').onclick=()=>{byId('extraPanel').scrollIntoView({behavior:'smooth',block:'start'})};
@@ -1027,7 +1116,7 @@ byId('stylePartsMode').addEventListener('change',refresh);
 byId('undoStyle').addEventListener('click',()=>{if(!prevLook)return;const now=styleFields();for(const [id,value] of Object.entries(prevLook))byId(id).value=value;prevLook=now;lastStyleSnapshot=styleFields();refresh()});
 byId('copyStyleOnly').addEventListener('click',()=>copy(buildStyle(),'絵柄タグ'));
  setupCollapsiblePanels();
-loadState();readCustomLooks();readSnapshots();renderCustomLooks();renderSnapshots();lastStyleSnapshot=styleFields();refresh();modeUI();renderTagList();
+loadState();readCustomLooks();readSnapshots();renderCustomLooks();renderSnapshots();lastStyleSnapshot=styleFields();refresh();modeUI();renderTagList();setTagDictMeta('日本語辞書の状態を確認しています…');ensureTagDictionary();
 
 </script>
 <script src="./firebase-config.js"></script>
