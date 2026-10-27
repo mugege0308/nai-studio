@@ -84,6 +84,7 @@
 .snapshotitem .snapshotlayout{display:flex;gap:11px;align-items:flex-start}
 .snapshotitem .snapshottext{flex:1;min-width:0}
 @media(max-width:440px){.snapshotimage{width:86px;height:86px}}
+.panel.collapsible > .panel-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:-2px 0 12px;padding-bottom:8px;border-bottom:1px solid #343750}.panel.collapsible > .panel-heading h2{margin:0;flex:1}.panel-heading .panel-toggle{flex:0 0 auto;border:1px solid #575472;border-radius:9px;background:#25273f;color:var(--ink);padding:6px 9px;font-size:12px;font-weight:700;cursor:pointer}.panel-heading .panel-toggle:focus-visible{outline:2px solid var(--accent);outline-offset:2px}.panel.collapsible.is-collapsed{padding-bottom:12px}.panel.collapsible.is-collapsed > *:not(.panel-heading){display:none}.style-direct-area{margin:10px 0 4px;padding:12px;border:1px solid #575472;border-radius:12px;background:#15162b}.style-direct-area textarea{width:100%;min-height:105px;resize:vertical;border:1px solid #44465f;background:#101222;color:var(--ink);border-radius:9px;padding:10px 11px;line-height:1.55}.style-direct-area textarea::placeholder{color:#7e809b}.panel-heading .pill{margin-left:5px}
 </style>
 <link rel="manifest" href="./manifest.json"><meta name="application-name" content="NAI Prompt Studio"><meta name="mobile-web-app-capable" content="yes"></head>
 <body>
@@ -105,6 +106,11 @@
      <div class="outheader"><h2 style="margin:0">① 絵柄をワンタップ調整</h2><span class="pill">NEW</span></div>
      <p class="small muted" style="margin-top:4px">長いタグを探して削除しなくてOK。項目を変えると古い指定と自動で入れ替わります。</p>
      <label class="toggle" style="margin:10px 0"><input id="stylePartsMode" type="checkbox" checked>パーツ別指定を使用（旧「絵柄」選択を上書き）</label>
+     <label class="toggle" style="margin:10px 0"><input id="styleDirectMode" type="checkbox">絵柄タグ全体を直接編集</label>
+     <div id="styleDirectArea" class="style-direct-area" style="display:none">
+      <div class="field"><label for="styleDirectTags">絵柄タグ全体（カンマまたは改行区切り）</label><textarea id="styleDirectTags" rows="5" placeholder="例: visual novel cg, crisp lineart, cel shading, detailed irises"></textarea></div>
+      <div class="actions" style="margin-top:8px"><button type="button" class="btn" id="copyStyleToDirect">現在の絵柄タグを編集欄へコピー</button><span class="hint">既存プリセットを押すと、パーツ別設定へ戻ります。</span></div>
+     </div>
      <div id="stylePartsArea">
       <p class="tiny muted" style="margin:7px 0">ワンタップでセットを切り替え</p>
       <div class="stylepresets">
@@ -362,20 +368,30 @@ const looks={
 for(const id of partIds){for(const [value,label] of partOptions[id]){const o=document.createElement('option');o.value=value;o.textContent=label;document.getElementById(id).appendChild(o)}}
 function styleFields(){const r={};for(const id of partIds)r[id]=document.getElementById(id).value;r.styleArtistOther=document.getElementById('styleArtistOther').value;return r}
 let prevLook=null;
-function buildStyle(){if(!document.getElementById('stylePartsMode').checked)return document.getElementById('style').value;
+function buildStyleFromParts(){
  const result=[],seen=new Set();for(const id of partIds){let term=id==='styleArtist'?(document.getElementById('styleArtistOther').value.trim()||document.getElementById(id).value):document.getElementById(id).value;
  for(const tag of term.split(',').map(s=>s.trim()).filter(Boolean)){const key=tag.toLowerCase();if(!seen.has(key)){seen.add(key);result.push(tag)}}}return result.join(', ');
+ }
+function normalizeDirectStyleTags(raw){
+ const result=[],seen=new Set();for(const tag of String(raw||'').split(/[,，\n]+/).map(s=>s.trim()).filter(Boolean)){const key=tag.toLowerCase();if(!seen.has(key)){seen.add(key);result.push(tag)}}return result.join(', ');
 }
+function buildStyle(){
+ if(document.getElementById('styleDirectMode').checked)return normalizeDirectStyleTags(document.getElementById('styleDirectTags').value);
+ if(!document.getElementById('stylePartsMode').checked)return document.getElementById('style').value;
+ return buildStyleFromParts();
+ }
 function refreshStyleView(){
  const useParts=document.getElementById('stylePartsMode').checked;
- document.getElementById('stylePartsArea').style.display=useParts?'':'none';
- document.getElementById('styleLegacyHint').style.display=useParts?'none':'';
- document.getElementById('style').closest('.field').style.display=useParts?'none':'';
+ const useDirect=document.getElementById('styleDirectMode').checked;
+ document.getElementById('styleDirectArea').style.display=useDirect?'':'none';
+ document.getElementById('stylePartsArea').style.display=!useDirect&&useParts?'':'none';
+ document.getElementById('styleLegacyHint').style.display=!useDirect&&useParts?'none':'';
+ document.getElementById('style').closest('.field').style.display=useDirect||useParts?'none':'';
  document.getElementById('stylePreview').textContent=buildStyle()||'指定なし';
- const current=styleFields();for(const b of document.querySelectorAll('[data-look]'))b.classList.toggle('active',useParts&&!current.styleArtistOther&&partIds.every(id=>current[id]===looks[b.dataset.look][id]));
+ const current=styleFields();for(const b of document.querySelectorAll('[data-look]'))b.classList.toggle('active',!useDirect&&useParts&&!current.styleArtistOther&&partIds.every(id=>current[id]===looks[b.dataset.look][id]));
  document.getElementById('undoStyle').disabled=!prevLook;
 }
-function applyLook(key){prevLook=styleFields();for(const id of partIds)document.getElementById(id).value=looks[key][id];document.getElementById('styleArtistOther').value='';document.getElementById('stylePartsMode').checked=true;refresh()}
+function applyLook(key){prevLook=styleFields();for(const id of partIds)document.getElementById(id).value=looks[key][id];document.getElementById('styleArtistOther').value='';document.getElementById('styleDirectMode').checked=false;document.getElementById('stylePartsMode').checked=true;refresh()}
 function styleChanged(old){prevLook=old;refresh()}
 
 const categories=[['all','すべて'],['face','表情・顔'],['hair','髪'],['clothes','衣装'],['pose','動作・ポーズ'],['camera','構図'],['scene','背景'],['light','光・雰囲気'],['details','小物・特徴']];
@@ -690,9 +706,9 @@ byId('onlineCategory').addEventListener('change',renderTagList);
 byId('autoTranslate').addEventListener('change',()=>{if(searchMode==='online')scheduleOnlineSearch()});
 byId('tagDestination').addEventListener('change',renderTagList);
 
-const stateIds=['character','outfit','pose','scene','expression','camera','viewMode','maleMode','maleCharacter','maleAppearance','maleOutfit','maleAction','maleExtra','girl2Character','girl2Appearance','girl2Outfit','girl2Action','girl2Extra','pasteTags','style','extras','femaleExtras','negative','useQuality','useSolo','stylePartsMode','styleArtistOther',...partIds];
-function saveState(){try{const data={};for(const id of stateIds)data[id]=byId(id).type==='checkbox'?byId(id).checked:byId(id).value;data.extraTags=extraTags;data.femaleTags=femaleTags;data.maleTags=maleTags;data.girl2Tags=girl2Tags;localStorage.setItem('nai_prompt_studio_v13',JSON.stringify(data));document.dispatchEvent(new Event('nai:statechanged'))}catch(e){}}
-function loadState(){try{const data=JSON.parse(localStorage.getItem('nai_prompt_studio_v13')||localStorage.getItem('nai_prompt_studio_v12')||localStorage.getItem('nai_prompt_studio_v11')||localStorage.getItem('nai_prompt_studio_v10')||localStorage.getItem('nai_prompt_studio_v9')||localStorage.getItem('nai_prompt_studio_v8')||localStorage.getItem('nai_prompt_studio_v7')||localStorage.getItem('nai_prompt_studio_v6')||localStorage.getItem('nai_prompt_studio_v5')||localStorage.getItem('nai_prompt_studio_v4')||localStorage.getItem('nai_prompt_studio_v1')||'null');if(!data)return;for(const id of stateIds){if(!(id in data))continue;const el=byId(id);if(el.type==='checkbox')el.checked=Boolean(data[id]);else if(el.tagName!=='SELECT'||[...el.options].some(opt=>opt.value===data[id]))el.value=data[id]}extraTags=Array.isArray(data.extraTags)?data.extraTags.filter(x=>typeof x==='string').slice(0,40):[];femaleTags=Array.isArray(data.femaleTags)?data.femaleTags.filter(x=>typeof x==='string').slice(0,40):[];maleTags=Array.isArray(data.maleTags)?data.maleTags.filter(x=>typeof x==='string').slice(0,40):[];girl2Tags=Array.isArray(data.girl2Tags)?data.girl2Tags.filter(x=>typeof x==='string').slice(0,40):[]}catch(e){}}
+const stateIds=['character','outfit','pose','scene','expression','camera','viewMode','maleMode','maleCharacter','maleAppearance','maleOutfit','maleAction','maleExtra','girl2Character','girl2Appearance','girl2Outfit','girl2Action','girl2Extra','pasteTags','style','extras','femaleExtras','negative','useQuality','useSolo','stylePartsMode','styleDirectMode','styleDirectTags','styleArtistOther',...partIds];
+function saveState(){try{const data={};for(const id of stateIds)data[id]=byId(id).type==='checkbox'?byId(id).checked:byId(id).value;data.extraTags=extraTags;data.femaleTags=femaleTags;data.maleTags=maleTags;data.girl2Tags=girl2Tags;data.panelCollapse=panelCollapseState();localStorage.setItem('nai_prompt_studio_v13',JSON.stringify(data));document.dispatchEvent(new Event('nai:statechanged'))}catch(e){}}
+function loadState(){try{const data=JSON.parse(localStorage.getItem('nai_prompt_studio_v13')||localStorage.getItem('nai_prompt_studio_v12')||localStorage.getItem('nai_prompt_studio_v11')||localStorage.getItem('nai_prompt_studio_v10')||localStorage.getItem('nai_prompt_studio_v9')||localStorage.getItem('nai_prompt_studio_v8')||localStorage.getItem('nai_prompt_studio_v7')||localStorage.getItem('nai_prompt_studio_v6')||localStorage.getItem('nai_prompt_studio_v5')||localStorage.getItem('nai_prompt_studio_v4')||localStorage.getItem('nai_prompt_studio_v1')||'null');if(!data)return;for(const id of stateIds){if(!(id in data))continue;const el=byId(id);if(el.type==='checkbox')el.checked=Boolean(data[id]);else if(el.tagName!=='SELECT'||[...el.options].some(opt=>opt.value===data[id]))el.value=data[id]}extraTags=Array.isArray(data.extraTags)?data.extraTags.filter(x=>typeof x==='string').slice(0,40):[];femaleTags=Array.isArray(data.femaleTags)?data.femaleTags.filter(x=>typeof x==='string').slice(0,40):[];maleTags=Array.isArray(data.maleTags)?data.maleTags.filter(x=>typeof x==='string').slice(0,40):[];girl2Tags=Array.isArray(data.girl2Tags)?data.girl2Tags.filter(x=>typeof x==='string').slice(0,40):[];applyPanelCollapse(data.panelCollapse)}catch(e){}}
 function setValues(dict){dict={maleMode:'none',maleCharacter:'',maleAppearance:'',maleOutfit:'',maleAction:'',maleExtra:'',girl2Character:'',girl2Appearance:'',girl2Outfit:'',girl2Action:'',girl2Extra:'',pasteTags:'',femaleExtras:'',...dict};for(const [id,value] of Object.entries(dict)){if(byId(id)){if(byId(id).type==='checkbox')byId(id).checked=Boolean(value);else byId(id).value=value}}extraTags=[];femaleTags=[];maleTags=[];girl2Tags=[];refresh();byId('copyStatus').textContent='プリセットを適用しました'}
 const presets={
  default:{outfit:'',pose:'',scene:'',expression:'gentle smile, blush',camera:'cowboy shot, three-quarter view',viewMode:'normal',extras:'',femaleExtras:''},
@@ -706,7 +722,7 @@ const CUSTOM_LOOK_KEY='nai_custom_looks_v5';
 let customLooks={};
 function readCustomLooks(){try{const x=JSON.parse(localStorage.getItem(CUSTOM_LOOK_KEY)||'{}');if(x&&typeof x==='object'&&!Array.isArray(x))customLooks=x}catch(e){}}
 function persistCustomLooks(){try{localStorage.setItem(CUSTOM_LOOK_KEY,JSON.stringify(customLooks));document.dispatchEvent(new Event('nai:statechanged'))}catch(e){}}
-function renderCustomLooks(){const p=byId('customLooks');p.replaceChildren();const names=Object.keys(customLooks);if(!names.length){const hint=document.createElement('p');hint.className='hint';hint.textContent='まだ保存した絵柄はありません。';p.appendChild(hint);return}for(const name of names){const row=document.createElement('div');row.className='customlook';const load=document.createElement('button');load.type='button';load.textContent='★ '+name;load.addEventListener('click',()=>{const look=customLooks[name];prevLook=styleFields();for(const id of partIds)byId(id).value=look[id]||'';byId('styleArtistOther').value=look.styleArtistOther||'';byId('stylePartsMode').checked=true;refresh();byId('copyStatus').textContent='保存した絵柄「'+name+'」を適用しました'});const del=document.createElement('button');del.type='button';del.textContent='削除';del.title='この保存絵柄を削除';del.addEventListener('click',()=>{if(confirm('「'+name+'」を削除しますか？')){delete customLooks[name];persistCustomLooks();renderCustomLooks()}});row.append(load,del);p.appendChild(row)}}
+function renderCustomLooks(){const p=byId('customLooks');p.replaceChildren();const names=Object.keys(customLooks);if(!names.length){const hint=document.createElement('p');hint.className='hint';hint.textContent='まだ保存した絵柄はありません。';p.appendChild(hint);return}for(const name of names){const row=document.createElement('div');row.className='customlook';const load=document.createElement('button');load.type='button';load.textContent='★ '+name;load.addEventListener('click',()=>{const look=customLooks[name];prevLook=styleFields();for(const id of partIds)byId(id).value=look[id]||'';byId('styleArtistOther').value=look.styleArtistOther||'';byId('styleDirectMode').checked=false;byId('stylePartsMode').checked=true;refresh();byId('copyStatus').textContent='保存した絵柄「'+name+'」を適用しました'});const del=document.createElement('button');del.type='button';del.textContent='削除';del.title='この保存絵柄を削除';del.addEventListener('click',()=>{if(confirm('「'+name+'」を削除しますか？')){delete customLooks[name];persistCustomLooks();renderCustomLooks()}});row.append(load,del);p.appendChild(row)}}
 function saveCurrentLook(){const name=byId('saveLookName').value.trim();if(!name){byId('copyStatus').textContent='絵柄の名前を入力してください';return}if(Object.keys(customLooks).length>=30&&!Object.prototype.hasOwnProperty.call(customLooks,name)){byId('copyStatus').textContent='保存は最大30件です';return}customLooks[name]=styleFields();persistCustomLooks();renderCustomLooks();byId('saveLookName').value='';byId('copyStatus').textContent='絵柄「'+name+'」を保存しました'}
 byId('saveCustomLook').addEventListener('click',saveCurrentLook);
 
@@ -719,7 +735,7 @@ const isSavedImage=x=>typeof x==='string'&&x.length<450000&&/^data:image\/(?:jpe
 function captureSettings(){
  const state={};
  for(const id of stateIds){const el=byId(id);state[id]=el.type==='checkbox'?el.checked:el.value}
- state.extraTags=[...extraTags];state.femaleTags=[...femaleTags];state.maleTags=[...maleTags];state.girl2Tags=[...girl2Tags];
+ state.extraTags=[...extraTags];state.femaleTags=[...femaleTags];state.maleTags=[...maleTags];state.girl2Tags=[...girl2Tags];state.panelCollapse=panelCollapseState();
  return state;
 }
 function applySettings(state){
@@ -738,6 +754,7 @@ function applySettings(state){
  ]){
   if(Array.isArray(state[key]))setter(state[key].filter(t=>typeof t==='string').slice(0,40));
  }
+  applyPanelCollapse(state.panelCollapse);
  lastStyleSnapshot=styleFields();
  refresh();
 }
@@ -821,11 +838,20 @@ byId('togglePasteSettings').addEventListener('click',()=>{byId('pasteSettingsAre
 byId('applyPastedSettings').addEventListener('click',loadFromText);
 byId('jumpSnapshots').onclick=()=>byId('snapshotPanel').scrollIntoView({behavior:'smooth',block:'start'});
 
-function exportAll(){const state={};for(const id of stateIds){const el=byId(id);state[id]=el.type==='checkbox'?el.checked:el.value}state.extraTags=extraTags;state.femaleTags=femaleTags;state.maleTags=maleTags;state.girl2Tags=girl2Tags;const payload={format:'NAI-Prompt-Studio-Settings',version:12,savedAt:new Date().toISOString(),state,customLooks,favoriteTags,savedSnapshots,draftImageData};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='NAI_Prompt_Studio_backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);byId('copyStatus').textContent='バックアップを書き出しました'}
+function exportAll(){const state=captureSettings();const payload={format:'NAI-Prompt-Studio-Settings',version:13,savedAt:new Date().toISOString(),state,customLooks,favoriteTags,savedSnapshots,draftImageData};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='NAI_Prompt_Studio_backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);byId('copyStatus').textContent='バックアップを書き出しました'}
 async function importAll(file){try{if(!file||file.size>12*1024*1024)throw Error('ファイルが大きすぎます');const payload=JSON.parse(await file.text());if(payload.format!=='NAI-Prompt-Studio-Settings'||!payload.state)throw Error('バックアップファイルではありません');const data=payload.state;for(const id of stateIds){if(!(id in data))continue;const el=byId(id);if(el.type==='checkbox')el.checked=Boolean(data[id]);else if(el.tagName!=='SELECT'||[...el.options].some(o=>o.value===data[id]))el.value=String(data[id]).slice(0,5000)}extraTags=Array.isArray(data.extraTags)?data.extraTags.filter(x=>typeof x==='string').slice(0,40):[];femaleTags=Array.isArray(data.femaleTags)?data.femaleTags.filter(x=>typeof x==='string').slice(0,40):[];maleTags=Array.isArray(data.maleTags)?data.maleTags.filter(x=>typeof x==='string').slice(0,40):[];girl2Tags=Array.isArray(data.girl2Tags)?data.girl2Tags.filter(x=>typeof x==='string').slice(0,40):[];if(payload.customLooks&&typeof payload.customLooks==='object'&&!Array.isArray(payload.customLooks)){customLooks={};for(const [name,look] of Object.entries(payload.customLooks).slice(0,30)){if(!look||typeof look!=='object')continue;customLooks[name.slice(0,40)]={};for(const id of [...partIds,'styleArtistOther'])customLooks[name.slice(0,40)][id]=String(look[id]||'').slice(0,400)}persistCustomLooks()}if(Array.isArray(payload.favoriteTags)){favoriteTags=payload.favoriteTags.filter(x=>typeof x==='string').slice(0,200);saveFavorites()}if(Array.isArray(payload.savedSnapshots)){const previous=savedSnapshots;savedSnapshots=validateSnapshots(payload.savedSnapshots);if(!persistSnapshots())savedSnapshots=previous;renderSnapshots()}setDraftImage(isSavedImage(payload.draftImageData)?payload.draftImageData:'');lastStyleSnapshot=styleFields();refresh();renderCustomLooks();byId('copyStatus').textContent='設定を読み込みました'}catch(e){byId('copyStatus').textContent='読み込みに失敗: '+e.message}finally{byId('importSettingsFile').value=''}}
 byId('exportSettings').onclick=exportAll;
 byId('importSettingsBtn').onclick=()=>byId('importSettingsFile').click();
 byId('importSettingsFile').onchange=e=>importAll(e.target.files?.[0]);
+{
+ const settingsInput=byId('importSettingsFile'),legacyImport=settingsInput.onchange;
+ settingsInput.onchange=async e=>{
+  const file=e.target.files?.[0];let panelCollapse=null;
+  if(file){try{panelCollapse=JSON.parse(await file.text())?.state?.panelCollapse||null}catch(err){}}
+  await legacyImport?.call(settingsInput,e);
+  if(panelCollapse){applyPanelCollapse(panelCollapse);saveState()}
+ };
+}
 for(const b of document.querySelectorAll('[data-pov]'))b.addEventListener('click',()=>{byId('viewMode').value=b.dataset.pov;syncViewMode()});
 byId('copyPovOnly').onclick=()=>copy([getPov().count,getPov().tags].filter(Boolean).join(', '),'POVタグ');
 byId('applyPovScene').onclick=()=>{setValues(presets.handpov);syncViewMode()};
@@ -948,6 +974,25 @@ function viewSnapshotImage(data,name){
  const close=()=>{backdrop.remove();document.removeEventListener('keydown',esc)};const esc=e=>{if(e.key==='Escape')close()};backdrop.addEventListener('click',close);document.addEventListener('keydown',esc);document.body.appendChild(backdrop);backdrop.focus();
 }
 
+const PANEL_KEYS=['presets','style','character','pov','extraTags','outputs','snapshots','cloud','negative','help','tagSearch'];
+function setupCollapsiblePanels(){
+ const panels=[...document.querySelectorAll('#buildArea section.panel,#tagsArea section.panel')];
+ for(const [index,panel] of panels.entries()){
+  const key=PANEL_KEYS[index]||`panel${index+1}`;panel.dataset.panelKey=key;panel.classList.add('collapsible');
+  const source=panel.querySelector(':scope > h2,:scope > .outheader > h2')||panel.querySelector('h2');
+  const heading=document.createElement('div');heading.className='panel-heading';heading.dataset.panelHeading='true';
+  if(source){
+   const container=source.parentElement;
+   if(container.classList.contains('outheader')){while(container.firstChild)heading.appendChild(container.firstChild);container.remove()}else{heading.appendChild(source)}
+  }else{const title=document.createElement('h2');title.textContent=key;heading.appendChild(title)}
+  const toggle=document.createElement('button');toggle.type='button';toggle.className='panel-toggle';toggle.addEventListener('click',()=>{const collapsed=panel.classList.toggle('is-collapsed');toggle.setAttribute('aria-expanded',String(!collapsed));toggle.textContent=collapsed?'開く':'閉じる';saveState()});
+  panel.id=panel.id||key+'Panel';panel.setAttribute('aria-labelledby',key+'-heading');heading.querySelector('h2')?.setAttribute('id',key+'-heading');heading.appendChild(toggle);panel.prepend(heading);
+  toggle.setAttribute('aria-expanded','true');toggle.textContent='閉じる';
+ }
+}
+function panelCollapseState(){const state={};for(const panel of document.querySelectorAll('[data-panel-key]'))state[panel.dataset.panelKey]=panel.classList.contains('is-collapsed');return state}
+function applyPanelCollapse(state){if(!state||typeof state!=='object')return;for(const panel of document.querySelectorAll('[data-panel-key]')){const collapsed=Boolean(state[panel.dataset.panelKey]);panel.classList.toggle('is-collapsed',collapsed);const toggle=panel.querySelector(':scope > .panel-heading > .panel-toggle');if(toggle){toggle.setAttribute('aria-expanded',String(!collapsed));toggle.textContent=collapsed?'開く':'閉じる'}}}
+
 // 新規初期値はこれまでのミリアの当たり絵柄。旧版の保存内容も読み込み、絵柄欄だけ別管理にする。
 for(const id of partIds)byId(id).value=looks.favorite[id];
 let lastStyleSnapshot=styleFields();
@@ -956,8 +1001,17 @@ for(const id of [...partIds,'styleArtistOther']){
  const el=byId(id);el.addEventListener('input',()=>{const before=lastStyleSnapshot;lastStyleSnapshot=styleFields();styleChanged(before)});
 }
 byId('stylePartsMode').addEventListener('change',refresh);
+ byId('styleDirectMode').addEventListener('change',()=>{
+  if(byId('styleDirectMode').checked&&!byId('styleDirectTags').value.trim()){
+   byId('styleDirectMode').checked=false;byId('styleDirectTags').value=buildStyle();byId('styleDirectMode').checked=true;
+  }
+  refresh();
+ });
+ byId('styleDirectTags').addEventListener('input',refresh);
+ byId('copyStyleToDirect').addEventListener('click',()=>{byId('styleDirectTags').value=buildStyle();byId('styleDirectMode').checked=true;refresh();byId('copyStatus').textContent='現在の絵柄タグを直接編集欄へコピーしました'});
 byId('undoStyle').addEventListener('click',()=>{if(!prevLook)return;const now=styleFields();for(const [id,value] of Object.entries(prevLook))byId(id).value=value;prevLook=now;lastStyleSnapshot=styleFields();refresh()});
 byId('copyStyleOnly').addEventListener('click',()=>copy(buildStyle(),'絵柄タグ'));
+ setupCollapsiblePanels();
 loadState();readCustomLooks();readSnapshots();renderCustomLooks();renderSnapshots();lastStyleSnapshot=styleFields();refresh();modeUI();renderTagList();
 
 </script>
