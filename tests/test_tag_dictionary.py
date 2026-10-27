@@ -9,6 +9,10 @@ SPEC = importlib.util.spec_from_file_location("tag_dictionary_updater", ROOT / "
 UPDATER = importlib.util.module_from_spec(SPEC)
 assert SPEC and SPEC.loader
 SPEC.loader.exec_module(UPDATER)
+SUPP_SPEC = importlib.util.spec_from_file_location("japanese_supplement", ROOT / "scripts" / "build_japanese_supplement.py")
+SUPPLEMENT = importlib.util.module_from_spec(SUPP_SPEC)
+assert SUPP_SPEC and SUPP_SPEC.loader
+SUPP_SPEC.loader.exec_module(SUPPLEMENT)
 
 
 class TagDictionaryTests(unittest.TestCase):
@@ -23,6 +27,7 @@ class TagDictionaryTests(unittest.TestCase):
     def test_generated_manifest_and_shards(self):
         manifest = json.loads((ROOT / "data" / "tagdb" / "manifest.json").read_text(encoding="utf-8"))
         self.assertEqual(manifest["status"], "ready")
+        self.assertEqual(manifest["supplement"], "translations-ja.json")
         self.assertGreaterEqual(manifest["total"], 100_000)
         self.assertEqual(sum(item["count"] for item in manifest["shards"].values()), manifest["total"])
         for shard in manifest["shards"].values():
@@ -30,6 +35,16 @@ class TagDictionaryTests(unittest.TestCase):
             self.assertTrue(path.exists())
             rows = json.loads(path.read_text(encoding="utf-8"))
             self.assertEqual(len(rows), shard["count"])
+
+    def test_supplement_is_separate_and_conservative(self):
+        supplement = json.loads((ROOT / "data" / "tagdb" / "translations-ja.json").read_text(encoding="utf-8"))
+        self.assertGreater(len(supplement["translations"]), 500)
+        self.assertEqual(SUPPLEMENT.translate_composite("black hat"), "黒い帽子")
+        self.assertEqual(SUPPLEMENT.translate_composite("anime character (cosplay)"), "")
+        source_rows = [row for shard in json.loads((ROOT / "data" / "tagdb" / "manifest.json").read_text(encoding="utf-8"))["shards"].values() for row in json.loads((ROOT / "data" / "tagdb" / shard["file"]).read_text(encoding="utf-8"))]
+        general = {row["tag"] for row in source_rows if row["category"] in (0, 5)}
+        self.assertTrue(set(supplement["translations"]).issubset(general))
+        self.assertTrue(all(not row["jp"] for row in source_rows if row["tag"] in supplement["translations"]))
 
     def test_maintained_synonyms_survive_upstream_update(self):
         synonyms = json.loads((ROOT / "data" / "tagdb" / "synonyms.json").read_text(encoding="utf-8"))

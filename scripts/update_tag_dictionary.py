@@ -110,6 +110,14 @@ def build(staging: Path, records: list[dict[str, object]]) -> dict[str, object]:
         path = staging / filename
         write_json(path, rows)
         shards[str(category)] = {"category": category, "name": name, "file": filename, "count": len(rows), "bytes": path.stat().st_size}
+    supplement_translated = 0
+    supplement_path = OUTPUT / "translations-ja.json"
+    if supplement_path.exists():
+        try:
+            supplement = json.loads(supplement_path.read_text(encoding="utf-8"))
+            supplement_translated = len(supplement.get("translations", {})) if isinstance(supplement, dict) else 0
+        except (OSError, json.JSONDecodeError):
+            supplement_translated = 0
     manifest = {
         "schemaVersion": 1,
         "status": "ready",
@@ -118,6 +126,8 @@ def build(staging: Path, records: list[dict[str, object]]) -> dict[str, object]:
                    "provenance": "Tag metadata is derived from Danbooru data; see the upstream README and attribution file."},
         "total": len(records),
         "translated": sum(1 for record in records if record["jp"]),
+        "supplement": "translations-ja.json",
+        "supplementTranslated": supplement_translated,
         "shards": shards,
         "synonyms": "synonyms.json",
     }

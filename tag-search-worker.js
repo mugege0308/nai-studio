@@ -2,6 +2,8 @@
 let basePath = "./data/tagdb/";
 let manifest = null;
 let synonymEntries = [];
+let supplement = {};
+let supplementPromise = null;
 const shardCache = new Map();
 
 const normalize = value => String(value || "")
@@ -15,11 +17,37 @@ function categoryAllowed(shard, category) {
   return !category || category === "all" || category === "upstream:" + shard.category;
 }
 
+function supplementalJapanese(tag) {
+  return supplement[normalize(tag)] || "";
+}
+
+function japaneseFor(record) {
+  return String(record?.jp || "").trim() || supplementalJapanese(record?.tag || "");
+}
+
+async function loadSupplement() {
+  if (supplementPromise) return supplementPromise;
+  supplementPromise = (async () => {
+    if (!manifest?.supplement) return;
+    try {
+      const response = await fetch(basePath + manifest.supplement, {cache: "force-cache"});
+      if (!response.ok) return;
+      const payload = await response.json();
+      const translations = payload?.translations;
+      if (!translations || typeof translations !== "object" || Array.isArray(translations)) return;
+      supplement = Object.fromEntries(Object.entries(translations).map(([tag, jp]) => [normalize(tag), String(jp || "").trim()]).filter(([, jp]) => jp));
+    } catch (_) {
+      supplement = {};
+    }
+  })();
+  return supplementPromise;
+}
+
 function scoreRecord(record, query) {
   const q = normalize(query);
   if (!q) return 0;
   const name = normalize(record.tag);
-  const jp = normalize(record.jp);
+  const jp = normalize(japaneseFor(record));
   const aliases = (record.aliases || []).map(normalize);
   const exact = value => value === q;
   const starts = value => value.startsWith(q);
@@ -77,6 +105,7 @@ async function search(message) {
   const query = String(message.query || "").trim();
   const category = String(message.category || "all");
   if (query.length < 2) return [];
+  await loadSupplement();
   const shards = Object.values(manifest.shards || {}).filter(shard => categoryAllowed(shard, category));
   const ranked = synonymResults(query);
   for (const shard of shards) {
@@ -92,6 +121,7 @@ async function search(message) {
     if (!key || !best.has(key) || best.get(key).score < record.score) best.set(key, record);
   }
   return [...best.values()]
+    .map(record => ({...record, jp: japaneseFor(record)}))
     .sort((a, b) => b.score - a.score || Number(b.count || 0) - Number(a.count || 0) || a.tag.localeCompare(b.tag))
     .slice(0, 120);
 }
@@ -103,6 +133,8 @@ self.onmessage = async event => {
       basePath = message.basePath || basePath;
       manifest = message.manifest;
       synonymEntries = Array.isArray(message.synonyms?.entries) ? message.synonyms.entries : [];
+      supplement = {};
+      supplementPromise = null;
       self.postMessage({type: "ready"});
       return;
     }

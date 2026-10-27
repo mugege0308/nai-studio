@@ -596,7 +596,8 @@ function clearSearchTags(){
 let searchMode='local',displayLimit=60,remoteTags=[],remoteError='',remoteLoading=false,remoteLastQuery='',favoriteTags=[];
 let fetchTimer=null,fetchAbort=null;
 const TAG_DICT_BASE='data/tagdb/';
-let tagDictManifest=null,tagDictWorker=null,tagDictInitPromise=null,tagDictRequest=0,tagDictSearchTimer=null,externalTagResults=[],tagDictError='';
+let tagDictManifest=null,tagDictWorker=null,tagDictInitPromise=null,tagDictRequest=0,tagDictSearchTimer=null,externalTagResults=[],tagDictError='',tagSupplement={};
+function japaneseForItem(item){return String(item?.jp||'').trim()||tagSupplement[normalize(item?.en||item?.tag||'')]||''}
 try{const saved=JSON.parse(localStorage.getItem('nai_favorite_tags_v2')||'[]');if(Array.isArray(saved))favoriteTags=saved.filter(x=>typeof x==='string').slice(0,200)}catch(e){}
 function saveFavorites(){try{localStorage.setItem('nai_favorite_tags_v2',JSON.stringify(favoriteTags));document.dispatchEvent(new Event('nai:statechanged'))}catch(e){}}
 function tagLabel(cat){return {0:'一般',1:'絵師',3:'作品',4:'キャラ',5:'メタ'}[cat]||'タグ'}
@@ -617,6 +618,13 @@ async function ensureTagDictionary(){
   }
   const synonymsResponse=await fetch(TAG_DICT_BASE+(manifest.synonyms||'synonyms.json'),{cache:'force-cache'});
   const synonyms=synonymsResponse.ok?await synonymsResponse.json():{entries:[]};
+  tagSupplement={};
+  if(manifest.supplement){
+   try{
+    const supplementResponse=await fetch(TAG_DICT_BASE+manifest.supplement,{cache:'force-cache'});
+    if(supplementResponse.ok){const supplement=await supplementResponse.json();if(supplement&&typeof supplement.translations==='object'&&!Array.isArray(supplement.translations)){tagSupplement=Object.fromEntries(Object.entries(supplement.translations).map(([tag,jp])=>[normalize(tag),String(jp||'').trim()]).filter(([,jp])=>jp))}}
+   }catch(_){tagSupplement={}}
+  }
   const worker=new Worker('tag-search-worker.js');
   tagDictWorker=worker;
   worker.addEventListener('message',event=>{
@@ -640,10 +648,11 @@ async function ensureTagDictionary(){
    worker.addEventListener('error',event=>{clearTimeout(timeout);reject(new Error(event.message||'辞書Workerの起動に失敗しました'))},{once:true});
    worker.postMessage({type:'init',basePath:TAG_DICT_BASE,manifest,synonyms});
   });
-  setTagDictMeta('上流辞書 '+Number(manifest.total).toLocaleString()+'件 / 翻訳 '+Number(manifest.translated||0).toLocaleString()+'件 / 最終更新 '+formatTagDictDate(manifest.generatedAt)+' / 出典 PYU224/tagdb-updater（MIT表記・上流データの注意事項あり）');
+  setTagDictMeta('上流辞書 '+Number(manifest.total).toLocaleString()+'件 / 翻訳 '+Number(manifest.translated||0).toLocaleString()+'件 / 補完訳 '+Object.keys(tagSupplement).length.toLocaleString()+'件 / 最終更新 '+formatTagDictDate(manifest.generatedAt)+' / 出典 PYU224/tagdb-updater（MIT表記・上流データの注意事項あり）');
   return true;
  })().catch(error=>{
   if(tagDictWorker){tagDictWorker.terminate();tagDictWorker=null}
+  tagSupplement={};
   tagDictError=String(error?.message||'辞書の取得に失敗しました');
   setTagDictMeta('日本語辞書の読み込みエラー：'+tagDictError+'（内蔵辞書は継続利用できます）',true);
   return false;
@@ -698,7 +707,7 @@ function toggleFavorite(tag){
  saveFavorites();renderTagList();
 }
 function tagCard(item){
- const {en,jp,cat,count}=item;
+ const {en,cat,count}=item,jp=japaneseForItem(item);
  const wrapper=document.createElement('div');wrapper.className='tagitem';
  const activeDest=byId('tagDestination').value,active=tagIsActive(en,activeDest);
  const main=document.createElement('button');main.className='tagbtn'+(active?' added':'');main.type='button';main.title=active?'選択した追加先から削除':'選択した追加先に入れる';
@@ -711,11 +720,11 @@ function getLocalResults(){
  const q=normalize(byId('tagQuery').value),cat=byId('tagCategory').value,words=q.split(' ').filter(Boolean);
  if(cat.startsWith('upstream:'))return externalTagResults.slice();
  const scored=allTags.filter(([c,en,jp])=>(cat==='all'||c===cat)).map(([c,en,jp])=>{
-  const name=normalize(en),translated=normalize(jp),text=name+' '+translated;
+  const translatedText=japaneseForItem({en,jp}),name=normalize(en),translated=normalize(translatedText),text=name+' '+translated;
   if(words.some(word=>!text.includes(word)))return null;
   let score=0;
   if(q){if(name===q)score=1000;else if(translated===q)score=980;else if(name.startsWith(q)||translated.startsWith(q))score=760;else if(name.includes(q)||translated.includes(q))score=560;}
-  return {en,jp,cat:c,score,kind:score>=980?'exact':'partial'};
+  return {en,jp:translatedText,cat:c,score,kind:score>=980?'exact':'partial'};
  }).filter(Boolean);
  if(q&&typeof jpTagSynonyms!=='undefined'){
   for(const [jp,terms] of jpTagSynonyms){
@@ -734,7 +743,7 @@ function renderTagList(){
  const el=byId('tagResults');el.innerHTML='';const q=normalize(byId('tagQuery').value);
  let items=[];
  if(searchMode==='local')items=getLocalResults();
- else if(searchMode==='saved')items=favoriteTags.map(en=>{const found=allTags.find(x=>normalize(x[1])===normalize(en));return {en,jp:found?.[2]||'',cat:found?.[0]||''}}).filter(t=>!q||normalize(t.en+' '+t.jp).includes(q));
+ else if(searchMode==='saved')items=favoriteTags.map(en=>{const found=allTags.find(x=>normalize(x[1])===normalize(en));return {en,jp:japaneseForItem({en,jp:found?.[2]||''}),cat:found?.[0]||''}}).filter(t=>!q||normalize(t.en+' '+t.jp).includes(q));
  else items=remoteTags.filter(x=>!byId('onlineCategory').value||String(x.cat)===byId('onlineCategory').value);
  const visible=items.slice(0,displayLimit);for(const item of visible)el.appendChild(tagCard(item));
  byId('resultCount').textContent=remoteLoading?'検索中…':(items.length+'件'+(items.length>displayLimit?' / '+displayLimit+'件表示':''));
@@ -767,7 +776,7 @@ function lookupJP(q){
  return [...scores.values()].sort((a,b)=>b.score-a.score||a.en.localeCompare(b.en));
 }
 function localPreview(results){
- return results.slice(0,50).map(x=>({en:x.en,jp:localByEnglish.get(normalize(x.en))?.[2]||x.jp||'',cat:({face:0,hair:0,clothes:0,pose:0,camera:0,scene:0,light:0,details:0})[localByEnglish.get(normalize(x.en))?.[0]]??0,source:'内蔵辞書候補'}));
+ return results.slice(0,50).map(x=>({en:x.en,jp:japaneseForItem({en:x.en,jp:localByEnglish.get(normalize(x.en))?.[2]||x.jp||''}),cat:({face:0,hair:0,clothes:0,pose:0,camera:0,scene:0,light:0,details:0})[localByEnglish.get(normalize(x.en))?.[0]]??0,source:'内蔵辞書候補'}));
 }
 function showConverted(original,candidates,kind){
  const el=byId('searchInterpretation');el.style.display='';
@@ -824,7 +833,7 @@ async function runOnlineSearch(){
    for(const entry of r.value){
     if(!entry?.name||entry.is_deprecated)continue;
     const en=String(entry.name).replace(/_/g,' '),key=normalize(en),local=localByEnglish.get(key),prev=combined.get(key);
-    combined.set(key,{en,jp:local?.[2]||prev?.jp||'',cat:Number(entry.category),count:Number(entry.post_count)||0,source:'Danbooru'});
+    combined.set(key,{en,jp:japaneseForItem({en,jp:local?.[2]||prev?.jp||''}),cat:Number(entry.category),count:Number(entry.post_count)||0,source:'Danbooru'});
    }
   }
   if(!success)throw new Error('Danbooruに接続できませんでした。辞書候補はそのまま利用できます。');
@@ -846,7 +855,7 @@ function scheduleOnlineSearch(){
 }
 function resetTagDictionary(){
  if(tagDictWorker){tagDictWorker.terminate();tagDictWorker=null}
- tagDictManifest=null;tagDictInitPromise=null;tagDictError='';externalTagResults=[];setTagDictMeta('辞書状態を確認しています…');requestTagDictionarySearch();
+ tagDictManifest=null;tagDictInitPromise=null;tagDictError='';tagSupplement={};externalTagResults=[];setTagDictMeta('辞書状態を確認しています…');requestTagDictionarySearch();
 }
 function setMode(mode){searchMode=mode;displayLimit=60;remoteError='';modeUI();if(mode==='online')scheduleOnlineSearch();else{if(fetchAbort)fetchAbort.abort();remoteLoading=false;renderTagList();requestTagDictionarySearch()}}
 for(const b of document.querySelectorAll('.modebtn'))b.addEventListener('click',()=>setMode(b.dataset.mode));
