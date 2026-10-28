@@ -626,7 +626,8 @@ function clearSearchTags(){
  searchAddedTags=emptySearchAdded();
  refresh();renderTagList();byId('copyStatus').textContent='検索から追加したタグを一括解除しました';
 }
-let searchMode='online',displayLimit=60,remoteTags=[],remoteError='',remoteLoading=false,remoteLastQuery='',favoriteTags=[];
+const DEFAULT_TAG_SEARCH_MODE='local';
+let searchMode=DEFAULT_TAG_SEARCH_MODE,displayLimit=60,remoteTags=[],remoteError='',remoteLoading=false,remoteLastQuery='',favoriteTags=[];
 let fetchTimer=null,fetchAbort=null;
 const TAG_DICT_BASE='data/tagdb/';
 let tagDictManifest=null,tagDictWorker=null,tagDictInitPromise=null,tagDictRequest=0,tagDictSearchTimer=null,externalTagResults=[],tagDictError='',tagSupplement={};
@@ -1019,7 +1020,14 @@ function resetTagDictionary(){
  tagDictManifest=null;tagDictInitPromise=null;tagDictError='';tagSupplement={};externalTagResults=[];setTagDictMeta('辞書状態を確認しています…');requestTagDictionarySearch();
 }
 function showFavoritesView(){favoriteView=true;if(fetchAbort){fetchAbort.abort();fetchAbort=null}remoteLoading=false;modeUI();renderFavorites()}
-function showTagSearchView(){favoriteView=false;if(searchMode==='saved')searchMode='online';modeUI();renderTagList();if(searchMode==='online'&&byId('tagQuery').value.trim())scheduleOnlineSearch()}
+function showTagSearchView(){
+ favoriteView=false;
+ searchMode=DEFAULT_TAG_SEARCH_MODE;
+ displayLimit=60;remoteError='';
+ if(fetchAbort){fetchAbort.abort();fetchAbort=null}
+ clearTimeout(fetchTimer);remoteLoading=false;
+ modeUI();renderTagList();requestTagDictionarySearch();
+}
 function setMode(mode){if(mode==='saved'){showFavoritesView();return}favoriteView=false;searchMode=mode;displayLimit=60;remoteError='';modeUI();if(mode==='online')scheduleOnlineSearch();else{if(fetchAbort)fetchAbort.abort();remoteLoading=false;renderTagList();requestTagDictionarySearch()}}
 for(const b of document.querySelectorAll('.modebtn'))b.addEventListener('click',()=>setMode(b.dataset.mode));
 byId('loadMoreTags').addEventListener('click',()=>{displayLimit+=60;renderTagList()});
@@ -1236,7 +1244,7 @@ byId('commitPastedTags').addEventListener('click',()=>{
  for(const t of tags){if(!extraTags.some(x=>normalize(x)===normalize(t))){extraTags.push(t);n++}}
  byId('pasteTags').value='';refresh();byId('copyStatus').textContent=n+'件のタグを個別追加しました';
 });
-function tab(which){const isBuild=which==='build';byId('buildArea').classList.toggle('hide',!isBuild);byId('tagsArea').classList.toggle('hide',isBuild);byId('tabBuild').classList.toggle('active',isBuild);byId('tabTags').classList.toggle('active',!isBuild);if(!isBuild){showTagSearchView();searchMode='online';modeUI();if(byId('tagQuery').value.trim())scheduleOnlineSearch()}window.scrollTo({top:0,behavior:'instant'})}
+function tab(which){const isBuild=which==='build';byId('buildArea').classList.toggle('hide',!isBuild);byId('tagsArea').classList.toggle('hide',isBuild);byId('tabBuild').classList.toggle('active',isBuild);byId('tabTags').classList.toggle('active',!isBuild);if(!isBuild)showTagSearchView();window.scrollTo({top:0,behavior:'instant'})}
 byId('tabBuild').onclick=()=>tab('build');byId('tabTags').onclick=()=>tab('tags');byId('goTags').onclick=()=>tab('tags');byId('returnBuild').onclick=()=>tab('build');
 byId('tagQuery').addEventListener('input',()=>{displayLimit=60;if(searchMode==='online')scheduleOnlineSearch();else{renderTagList();requestTagDictionarySearch()}});byId('tagCategory').addEventListener('change',()=>{displayLimit=60;renderTagList();requestTagDictionarySearch()});
 byId('clearSearchTags').onclick=clearSearchTags;
