@@ -89,7 +89,7 @@
 <style>
 .tag-view-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}.tag-view-tab{border:1px solid #52536f;border-radius:11px;background:#242641;color:#dad7ed;padding:11px 10px;font-weight:700}.tag-view-tab.active{background:var(--accent);color:#211d20;border-color:var(--accent)}
 .tag-copy{flex:0 0 auto;border:1px solid #6a648c;border-radius:9px;background:#393451;color:#f3edcf;padding:8px 9px;font-size:12px;font-weight:700}.tag-copy:active{transform:translateY(1px)}.tagitem .tagbtn{border-radius:11px 0 0 11px}.tagitem .tag-copy{border-radius:0;border-width:0 1px 0 1px}.tagitem .favbtn{border-radius:0 10px 10px 0}
-.favorite-manager{display:grid;gap:12px}.favorite-toolbar{display:grid;grid-template-columns:1fr 1fr;gap:8px}.favorite-toolbar .full{grid-column:1 / -1}.favorite-toolbar input,.favorite-toolbar select{width:100%;border:1px solid #44465f;background:#101222;color:var(--ink);border-radius:9px;padding:10px 11px}.favorite-section{border:1px solid #44465f;border-radius:12px;padding:11px;background:#151728}.favorite-section h3{margin:0 0 8px}.favorite-folder{border:1px solid #4d4e69;border-radius:10px;margin:8px 0;padding:9px;background:#20223a}.favorite-folder-head{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.favorite-folder-head strong{flex:1;min-width:120px}.favorite-entry{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 0;border-top:1px solid #393b54}.favorite-entry:first-of-type{border-top:0}.favorite-entry .favorite-label{flex:1;min-width:150px;overflow-wrap:anywhere}.favorite-entry .favorite-en{display:block;color:var(--muted);font-size:11px}.favorite-entry .btn{padding:7px 8px;font-size:11px}.favorite-empty{color:var(--muted);font-size:12px;padding:5px 0}.favorite-modal{position:fixed;inset:0;z-index:20;background:#070814aa;display:flex;align-items:center;justify-content:center;padding:18px}.favorite-modal-card{width:min(460px,100%);border:1px solid #676284;border-radius:15px;background:#1a1c30;padding:15px;box-shadow:0 12px 50px #0009}.favorite-modal-card h3{margin:0 0 8px}.favorite-modal-card select,.favorite-modal-card input{width:100%;border:1px solid #44465f;background:#101222;color:var(--ink);border-radius:9px;padding:10px 11px;margin-top:5px}.favorite-modal-card .actions{margin-top:12px}.favorite-modal-card .favorite-remove{color:#ffc9cf}
+.favorite-manager{display:grid;gap:12px}.favorite-toolbar{display:grid;grid-template-columns:1fr 1fr;gap:8px}.favorite-toolbar .full{grid-column:1 / -1}.favorite-toolbar input,.favorite-toolbar select{width:100%;border:1px solid #44465f;background:#101222;color:var(--ink);border-radius:9px;padding:10px 11px}.favorite-section{border:1px solid #44465f;border-radius:12px;padding:11px;background:#151728}.favorite-section h3{margin:0 0 8px}.favorite-folder{border:1px solid #4d4e69;border-radius:10px;margin:8px 0;padding:9px;background:#20223a}.favorite-folder-head{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.favorite-folder-head strong{flex:1;min-width:120px}.favorite-entry{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 0;border-top:1px solid #393b54}.favorite-entry:first-of-type{border-top:0}.favorite-entry .favorite-label{flex:1;min-width:150px;overflow-wrap:anywhere}.favorite-entry .favorite-en{display:block;color:var(--muted);font-size:11px}.favorite-entry .btn{padding:7px 8px;font-size:11px}.favorite-empty{color:var(--muted);font-size:12px;padding:5px 0}.favorite-picker-list{display:grid;gap:8px;max-height:55vh;overflow:auto;margin-top:10px}.favorite-picker-folder{border:1px solid #4d4e69;border-radius:10px;padding:9px;background:#20223a}.favorite-picker-folder strong{display:block;margin-bottom:6px}.favorite-picker-entry{width:100%;text-align:left}.favorite-modal{position:fixed;inset:0;z-index:20;background:#070814aa;display:flex;align-items:center;justify-content:center;padding:18px}.favorite-modal-card{width:min(460px,100%);border:1px solid #676284;border-radius:15px;background:#1a1c30;padding:15px;box-shadow:0 12px 50px #0009}.favorite-modal-card h3{margin:0 0 8px}.favorite-modal-card select,.favorite-modal-card input{width:100%;border:1px solid #44465f;background:#101222;color:var(--ink);border-radius:9px;padding:10px 11px;margin-top:5px}.favorite-modal-card .actions{margin-top:12px}.favorite-modal-card .favorite-remove{color:#ffc9cf}
 @media(max-width:480px){.favorite-toolbar{grid-template-columns:1fr}.favorite-toolbar .full{grid-column:auto}.tagitem .tagbtn{padding:9px 7px}.tag-copy{padding:9px 7px}.favorite-entry .btn{flex:1;min-width:76px}}
 </style>
 <link rel="manifest" href="./manifest.json"><meta name="application-name" content="NAI Prompt Studio"><meta name="mobile-web-app-capable" content="yes"></head>
@@ -148,7 +148,7 @@
     </section>
 
     <section class="panel"><h2>② キャラとシーン</h2><p class="note" style="margin-bottom:12px">R18寄りや男女構図では、<strong>共通</strong>＝体位・構図・場所・雰囲気、<strong>女の子</strong>＝見た目・服・表情、<strong>男性</strong>＝相手の外見・役割、の3分けがおすすめです。</p><div class="formgrid">
-       <div class="field full"><label for="character">キャラ名 / 作品名（英語タグ推奨）</label><input id="character" type="text" value="saeki miria (mahou shoujo no majo saiban)" autocomplete="off"><p class="hint">ここだけ変えれば別キャラに使い回せる。外見タグはあえて固定しません。</p></div>
+       <div class="field full"><label for="character">キャラ名 / 作品名（英語タグ推奨）</label><input id="character" type="text" value="saeki miria (mahou shoujo no majo saiban)" autocomplete="off"><div class="actions" style="margin-top:8px"><button type="button" class="btn" id="chooseFavoriteCharacter">お気に入りから選択</button></div><p class="hint">ここだけ変えれば別キャラに使い回せる。外見タグはあえて固定しません。</p></div>
        <div class="field"><label for="outfit">服装</label><select id="outfit"></select></div>
        <div class="field"><label for="pose">ポーズ・動作</label><select id="pose"></select></div>
        <div class="field"><label for="scene">背景・場所</label><select id="scene"></select></div>
@@ -324,7 +324,7 @@
    <div class="formgrid searchopts">
      <div class="field" id="localCategoryWrap"><label for="tagCategory">カテゴリ</label><select id="tagCategory"></select></div>
      <div class="field" id="onlineCategoryWrap" style="display:none"><label for="onlineCategory">オンラインの分類</label><select id="onlineCategory"><option value="">すべて</option><option value="0">一般タグ</option><option value="4">キャラクター</option><option value="3">作品名</option><option value="1">絵師</option><option value="5">メタ</option></select></div>
-     <div class="field"><label for="tagDestination">追加先</label><select id="tagDestination"><option value="positive">共通プロンプト</option><option value="female">女の子個別</option><option value="male">2人目：男性</option><option value="girl2">2人目：女の子</option><option value="negative">UC（除外）</option></select></div>
+     <div class="field"><label for="tagDestination">追加先</label><select id="tagDestination"><option value="positive">共通プロンプト</option><option value="female">女の子個別</option><option value="male">2人目：男性</option><option value="girl2">2人目：女の子</option><option value="negative">UC（除外）</option><option value="replace_character">キャラ1に差し替え</option><option value="replace_character2">キャラ2に差し替え</option></select></div>
    </div>
    <p class="small muted" id="searchGuide">日本語の意味から検索できます。内蔵辞書は通信不要で、上流辞書は必要なカテゴリだけ遅延読み込みします。</p>
    <label class="toggle" id="autoTranslateWrap" style="display:none"><input type="checkbox" id="autoTranslate" checked>辞書にない日本語は自動翻訳して検索（外部サービス）</label>
@@ -358,6 +358,14 @@
    <div id="favoriteChooserLabelWrap" class="field"><label for="favoriteChooserLabel">日本語表示名（任意）</label><input id="favoriteChooserLabel" type="text" maxlength="80" placeholder="例：銀髪"></div>
    <div class="actions"><button type="button" class="btn primary" id="saveFavoriteChoice">保存</button><button type="button" class="btn ghost" id="closeFavoriteChooser">キャンセル</button><button type="button" class="btn favorite-remove hide" id="removeFavoriteChoice">すべてのフォルダから削除</button></div>
   </div>
+ </div>
+</div>
+<div id="characterFavoritePicker" class="favorite-modal hide" role="dialog" aria-modal="true" aria-labelledby="characterFavoritePickerTitle">
+ <div class="favorite-modal-card">
+  <h3 id="characterFavoritePickerTitle">お気に入りキャラクターを選択</h3>
+  <p class="small muted">作品フォルダに保存したキャラクターだけを表示します。選択するとキャラ1を完全に置き換えます。</p>
+  <div id="characterFavoritePickerList" class="favorite-picker-list"></div>
+  <div class="actions"><button type="button" class="btn ghost" id="closeCharacterFavoritePicker">キャンセル</button></div>
  </div>
 </div>
 <footer class="footer">内蔵辞書は一般的なタグ候補を収録。Danbooruの全件ではありません。オンライン検索結果は英語タグで、登録済みの語には日本語の意味も表示します。利用件数はDanbooru上の件数です。<br>プロンプトの効き方はモデルや設定により変わります。v8では「共通 / 1人目 / 2人目」を別出力できます。パーツ別の絵柄設定は以前気に入った monobe yuri を初期値に設定しています。<br>NovelAIやDanbooruの公式ツールではない個人用テンプレートです。<br>日本語Danbooru検索は内蔵タグ辞書と同義語による変換で実現。未登録語のみ任意で <a href="https://mymemory.translated.net/doc/spec.php" target="_blank" rel="noopener noreferrer">MyMemory</a> の公開翻訳APIを使用します。オフライン翻訳には限界があります。</footer>
@@ -487,7 +495,16 @@ function tagArrayForDestination(dest){return dest==='female'?femaleTags:dest==='
 function searchAddedArray(dest){return searchAddedTags[dest]||[]}
 function markSearchTag(dest,tag){const list=searchAddedArray(dest);if(!list.some(item=>normalize(item)===normalize(tag)))list.push(tag)}
 function unmarkSearchTag(dest,tag){searchAddedTags[dest]=searchAddedArray(dest).filter(item=>normalize(item)!==normalize(tag))}
+function characterReplaceTarget(dest=byId('tagDestination')?.value){return dest==='replace_character'?'character':dest==='replace_character2'?'maleCharacter':''}
+function characterTargetField(target){if(target==='character')return 'character';if(byId('maleMode').value==='none')return '';return byId('maleMode').value==='girl2'?'girl2Character':'maleCharacter'}
+function characterTargetLabel(target){if(target==='character')return 'キャラ1';return byId('maleMode').value==='girl2'?'キャラ2（女の子）':'キャラ2（男性）'}
+function replaceCharacterFromTag(tag,target){
+ const field=characterTargetField(target);if(!field){setFavoriteStatus('キャラ2は現在未使用です。先に「2人目の種類・映り方」を選択してください。');return false}
+ byId(field).value=String(tag||'').replace(/_/g,' ').trim();refresh();renderTagList();setFavoriteStatus(characterTargetLabel(target)+'を「'+byId(field).value+'」に差し替えました');return true;
+}
+function isCharacterTag(item){const cat=item?.cat??item?.category;return Number(cat)===4||String(cat||'').toLowerCase()==='character'}
 function tagIsActive(en,dest){
+ const target=characterReplaceTarget(dest);if(target){const field=characterTargetField(target);return Boolean(field&&normalize(byId(field).value)===normalize(en))}
  if(dest==='negative')return byId('negative').value.split(/[,，\n]+/).some(item=>normalize(item)===normalize(en));
  return tagArrayForDestination(dest).some(item=>normalize(item)===normalize(en));
 }
@@ -698,8 +715,14 @@ function renderFavoriteFolderControls(){
 }
 function setFavoriteStatus(text){const el=byId('copyStatus');if(el)el.textContent=text;const tagStatus=byId('tagSearchStatus');if(tagStatus)tagStatus.textContent=text}
 function applySavedCharacter(tag,target){
- const field=target==='character'?'character':byId('maleMode').value==='girl2'?'girl2Character':'maleCharacter';byId(field).value=tag;refresh();setFavoriteStatus((target==='character'?'キャラ1':field==='girl2Character'?'キャラ2（女の子）':'キャラ2（男性）')+'を差し替えました');
+ const field=target==='character'?'character':characterTargetField('maleCharacter');if(!field){setFavoriteStatus('キャラ2は現在未使用です。先に「2人目の種類・映り方」を選択してください。');return false}byId(field).value=tag;refresh();setFavoriteStatus((target==='character'?'キャラ1':field==='girl2Character'?'キャラ2（女の子）':'キャラ2（男性）')+'を差し替えました');return true;
 }
+function renderCharacterFavoritePicker(){
+ const root=byId('characterFavoritePickerList');if(!root)return;root.replaceChildren();if(!favoriteCollections.works.length){const empty=document.createElement('p');empty.className='small muted';empty.textContent='作品フォルダに保存されたキャラクターがありません。タグ検索の☆から作品フォルダへ保存してください。';root.appendChild(empty);return}
+ for(const folder of favoriteCollections.works){const box=document.createElement('div');box.className='favorite-picker-folder';const title=document.createElement('strong');title.textContent=folder.name;box.appendChild(title);if(!folder.characters.length){const empty=document.createElement('div');empty.className='favorite-empty';empty.textContent='キャラクター未登録';box.appendChild(empty)}else for(const entry of folder.characters){const button=document.createElement('button');button.type='button';button.className='btn favorite-picker-entry';button.textContent=(entry.label||entry.tag)+'  ·  '+entry.tag;button.title='キャラ1をこのタグに置き換え';button.onclick=()=>{applySavedCharacter(entry.tag,'character');closeCharacterFavoritePicker()};box.appendChild(button)}root.appendChild(box)}
+}
+function openCharacterFavoritePicker(){renderCharacterFavoritePicker();byId('characterFavoritePicker').classList.remove('hide')}
+function closeCharacterFavoritePicker(){byId('characterFavoritePicker').classList.add('hide')}
 function copyFavoriteTag(tag){copy(tag,'英語タグ').then(ok=>{if(ok)setFavoriteStatus('「'+tag+'」をコピーしました')})}
 function findFavoriteFolder(type,id){return favoriteFolders(type).find(x=>x.id===id)}
 function moveFavoriteEntry(entry,sourceType,sourceId,targetValue){
@@ -838,6 +861,7 @@ function modeUI(){
 }
 function addTag(en,source='search'){
  en=en.replace(/_/g,' ').trim();if(!en)return;
+ const replacementTarget=characterReplaceTarget();if(replacementTarget){setFavoriteStatus('差し替えにはキャラクターカテゴリの検索結果を使ってください。');return}
  if(byId('tagDestination').value==='negative'){
   const dest='negative',neg=byId('negative'),parts=neg.value.split(/[,，\n]+/).map(x=>x.trim()).filter(Boolean),idx=parts.findIndex(x=>normalize(x)===normalize(en));
   if(idx>=0){parts.splice(idx,1);unmarkSearchTag(dest,en);byId('tagSearchStatus').textContent='UCから「'+en+'」を外しました。'}
@@ -860,12 +884,13 @@ function copyTag(tag){copy(tag,'英語タグ').then(ok=>{if(ok)byId('tagSearchSt
 function tagCard(item){
  const {en,cat,count}=item,jp=japaneseForItem(item);
  const wrapper=document.createElement('div');wrapper.className='tagitem';
- const activeDest=byId('tagDestination').value,active=tagIsActive(en,activeDest);
+ const activeDest=byId('tagDestination').value,replacementTarget=characterReplaceTarget(activeDest),characterTag=isCharacterTag(item),active=tagIsActive(en,activeDest),targetReady=!replacementTarget||replacementTarget==='character'||byId('maleMode').value!=='none';
  const main=document.createElement('button');main.className='tagbtn'+(active?' added':'');main.type='button';main.title=active?'選択した追加先から削除':'選択した追加先に入れる';
  const left=document.createElement('span'),a=document.createElement('span'),sub=document.createElement('span');a.className='primary';a.textContent=jp||en;
  const status=item.verified===false?(item.kind==='related'?'関連候補・実在未確認':'自由プロンプト候補・実在未確認'):(item.kind==='related'?'関連タグ':'');
  sub.className='secondary';sub.textContent=[jp?'英語：'+en:'英語タグ',status,Number.isFinite(count)&&count>0?'使用 '+count.toLocaleString()+'件':'',typeof cat==='number'?tagLabel(cat):''].filter(Boolean).join(' · ');
- left.append(a,sub);const plus=document.createElement('span');plus.className='plus';plus.textContent=active?'✓':'＋';main.append(left,plus);main.addEventListener('click',()=>addTag(en,'search'));
+ left.append(a,sub);const plus=document.createElement('span');plus.className='plus';plus.textContent=replacementTarget?(characterTag?(targetReady?(active?'済':'差替'):'案内'):'対象外'):active?'✓':'＋';main.append(left,plus);
+ if(replacementTarget){main.title=characterTag?(targetReady?'選択したキャラクタータグで'+(replacementTarget==='character'?'キャラ1':'キャラ2')+'を完全に置換':'キャラ2が未使用です。先に2人目の種類を選択してください'):'キャラクターカテゴリのタグだけ差し替えできます';main.disabled=!characterTag;main.addEventListener('click',()=>{if(characterTag)replaceCharacterFromTag(en,replacementTarget)})}else{main.title=active?'選択した追加先から削除':'選択した追加先に入れる';main.addEventListener('click',()=>addTag(en,'search'))}
  const copyButton=document.createElement('button');copyButton.type='button';copyButton.className='tag-copy';copyButton.textContent='コピー';copyButton.title='英語タグだけをコピー';copyButton.addEventListener('click',event=>{event.stopPropagation();copyTag(en)});
  const fav=document.createElement('button');fav.className='favbtn'+(favoriteIsSaved(en)?' favorite':'');fav.type='button';fav.title='保存先フォルダを選ぶ';fav.setAttribute('aria-label',en+'をお気に入りに保存');fav.textContent=favoriteIsSaved(en)?'★':'☆';fav.addEventListener('click',event=>{event.stopPropagation();toggleFavorite(en)});
  wrapper.append(main,copyButton,fav);return wrapper;
@@ -1035,9 +1060,10 @@ byId('addTypedTag').addEventListener('click',()=>addTag(byId('tagQuery').value))
 byId('retryOnline').addEventListener('click',()=>{remoteError='';runOnlineSearch()});
 byId('onlineCategory').addEventListener('change',renderTagList);
 byId('autoTranslate').addEventListener('change',()=>{if(searchMode==='online')scheduleOnlineSearch()});
-byId('tagDestination').addEventListener('change',renderTagList);
+byId('tagDestination').addEventListener('change',()=>{renderTagList();const target=characterReplaceTarget();if(target==='maleCharacter'&&byId('maleMode').value==='none')setFavoriteStatus('キャラ2は現在未使用です。差し替え前に2人目の種類を選択してください。');else if(target)setFavoriteStatus((target==='character'?'キャラ1':'キャラ2')+'の差し替えを選択中です。キャラクターカテゴリの「差替」を押してください。')});
 byId('reloadTagDict').addEventListener('click',resetTagDictionary);
 byId('tagSearchViewTab').onclick=showTagSearchView;byId('favoriteViewTab').onclick=showFavoritesView;
+byId('chooseFavoriteCharacter').onclick=openCharacterFavoritePicker;byId('closeCharacterFavoritePicker').onclick=closeCharacterFavoritePicker;
 byId('favoriteFolderType').addEventListener('change',renderFavorites);
 byId('favoriteFilter').addEventListener('input',renderFavorites);byId('favoriteSort').addEventListener('change',renderFavorites);
 byId('addFavoriteFolder').onclick=addFavoriteFolder;byId('renameFavoriteFolder').onclick=renameFavoriteFolder;byId('deleteFavoriteFolder').onclick=deleteFavoriteFolder;
@@ -1234,7 +1260,7 @@ for(const id of stateIds){
  const el=byId(id);if(id==='maleMode'||id==='viewMode')continue;
  el.addEventListener('input',refresh);el.addEventListener('change',refresh);
 }
-byId('maleMode').addEventListener('change',syncMaleMode);
+byId('maleMode').addEventListener('change',()=>{syncMaleMode();renderTagList()});
 byId('viewMode').addEventListener('change',syncViewMode);
 byId('clearPastedTags').addEventListener('click',()=>{byId('pasteTags').value='';refresh();byId('copyStatus').textContent='貼り付けタグをクリアしました'});
 byId('commitPastedTags').addEventListener('click',()=>{
