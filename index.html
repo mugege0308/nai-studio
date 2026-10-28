@@ -101,6 +101,12 @@
  <button class="btn ghost" id="jumpMale" type="button">＋ 2人目キャラ入力へ</button>
  <button class="btn ghost" id="jumpExtra" type="button">＋ タグ直接入力へ</button><button class="btn ghost" id="jumpSnapshots" type="button">★ 保存した設定へ</button>
 </div>
+<div class="panel reset-panel" id="promptResetPanel">
+ <div class="outheader"><h2 style="margin:0">新しいプロンプト</h2><button class="btn ghost" id="undoPromptReset" type="button" disabled>↶ 直前のリセットを元に戻す</button></div>
+ <p class="small muted" style="margin:0 0 10px">前の追加タグを残さず、用途に合わせて安全に作り直します。実行前に確認が表示されます。</p>
+ <div class="actions"><button class="btn" id="resetScene" type="button">シーンをリセット</button><button class="btn" id="resetNewPrompt" type="button">新規作成</button></div>
+ <p class="hint">シーンのリセットはキャラ名・絵柄・2人目の有効状態を保持します。新規作成は絵柄とUCを保持します。</p>
+</div>
 <div id="buildArea" class="layout">
   <div class="stack">
     <section class="panel"><h2>すぐ使えるプリセット</h2><div class="presets">
@@ -643,6 +649,13 @@ function clearSearchTags(){
  searchAddedTags=emptySearchAdded();
  refresh();renderTagList();byId('copyStatus').textContent='検索から追加したタグを一括解除しました';
 }
+// 追加タグだけを完全に空にする。UCは対象外なので、UCの検索管理だけ保持する。
+function clearAdditionalTags(){
+ const negativeSearchTags=[...searchAddedArray('negative')];
+ extraTags=[];femaleTags=[];maleTags=[];girl2Tags=[];
+ byId('pasteTags').value='';byId('femaleExtras').value='';byId('maleExtra').value='';byId('girl2Extra').value='';
+ searchAddedTags=emptySearchAdded();searchAddedTags.negative=negativeSearchTags;
+}
 const DEFAULT_TAG_SEARCH_MODE='local';
 let searchMode=DEFAULT_TAG_SEARCH_MODE,displayLimit=60,remoteTags=[],remoteError='',remoteLoading=false,remoteLastQuery='',favoriteTags=[];
 let fetchTimer=null,fetchAbort=null;
@@ -1145,6 +1158,44 @@ function applySettings(state){
  lastStyleSnapshot=styleFields();
  refresh();
 }
+const RESET_UNDO_KEY='nai_prompt_reset_undo_v1';
+let resetUndoState=null;
+function persistResetUndo(){
+ try{if(resetUndoState)sessionStorage.setItem(RESET_UNDO_KEY,JSON.stringify(resetUndoState));else sessionStorage.removeItem(RESET_UNDO_KEY)}catch(e){}
+ updateResetUndoButton();
+}
+function updateResetUndoButton(){
+ const button=byId('undoPromptReset');if(button)button.disabled=!resetUndoState;
+}
+function readResetUndo(){
+ try{const saved=JSON.parse(sessionStorage.getItem(RESET_UNDO_KEY)||'null');resetUndoState=saved&&typeof saved==='object'&&!Array.isArray(saved)?saved:null}catch(e){resetUndoState=null}
+ updateResetUndoButton();
+}
+function saveResetUndo(){
+ try{resetUndoState=captureSettings();persistResetUndo();return true}catch(e){byId('copyStatus').textContent='リセット前の状態を保存できないため、処理を中止しました。';return false}
+}
+function resetScenePrompt(){
+ if(!confirm('シーン設定と追加タグをリセットしますか？キャラ名・絵柄・2人目の有効状態は保持されます。'))return;
+ if(!saveResetUndo())return;
+ for(const id of ['pose','scene','expression','camera','viewMode','extras','maleAction','girl2Action']){
+  const el=byId(id);if(el)el.value=id==='viewMode'?'normal':'';
+ }
+ clearAdditionalTags();refresh();byId('copyStatus').textContent='シーンと追加タグをリセットしました。元に戻せます。';
+}
+function resetNewPrompt(){
+ if(!confirm('新しいプロンプトを作成しますか？絵柄とUCは保持され、キャラ2は未使用になります。'))return;
+ if(!saveResetUndo())return;
+ for(const id of ['character','outfit','pose','scene','expression','camera','viewMode','maleCharacter','maleAppearance','maleOutfit','maleAction','girl2Character','girl2Appearance','girl2Outfit','girl2Action']){
+  const el=byId(id);if(el)el.value=id==='viewMode'?'normal':'';
+ }
+ byId('maleMode').value='none';clearAdditionalTags();refresh();byId('copyStatus').textContent='新しいプロンプト用にリセットしました。元に戻せます。';
+}
+function undoPromptReset(){
+ if(!resetUndoState)return;
+ if(!confirm('直前のリセット前の状態に戻しますか？'))return;
+ const previous=resetUndoState;
+ try{applySettings(previous);resetUndoState=null;persistResetUndo();byId('copyStatus').textContent='直前のリセット前の状態に戻しました。'}catch(e){resetUndoState=previous;persistResetUndo();byId('copyStatus').textContent='元に戻せませんでした。現在の設定は変更していません。'}
+}
 function validateSnapshots(input){
  const result=[];
  if(!Array.isArray(input))return result;
@@ -1263,6 +1314,9 @@ for(const id of stateIds){
 byId('maleMode').addEventListener('change',()=>{syncMaleMode();renderTagList()});
 byId('viewMode').addEventListener('change',syncViewMode);
 byId('clearPastedTags').addEventListener('click',()=>{byId('pasteTags').value='';refresh();byId('copyStatus').textContent='貼り付けタグをクリアしました'});
+byId('resetScene').addEventListener('click',resetScenePrompt);
+byId('resetNewPrompt').addEventListener('click',resetNewPrompt);
+byId('undoPromptReset').addEventListener('click',undoPromptReset);
 byId('commitPastedTags').addEventListener('click',()=>{
  const raw=byId('pasteTags').value.trim();if(!raw){byId('copyStatus').textContent='取り込むタグがありません';return}
  const tags=raw.split(/[,，\n]+/).map(x=>x.trim()).filter(Boolean);
@@ -1274,7 +1328,7 @@ function tab(which){const isBuild=which==='build';byId('buildArea').classList.to
 byId('tabBuild').onclick=()=>tab('build');byId('tabTags').onclick=()=>tab('tags');byId('goTags').onclick=()=>tab('tags');byId('returnBuild').onclick=()=>tab('build');
 byId('tagQuery').addEventListener('input',()=>{displayLimit=60;if(searchMode==='online')scheduleOnlineSearch();else{renderTagList();requestTagDictionarySearch()}});byId('tagCategory').addEventListener('change',()=>{displayLimit=60;renderTagList();requestTagDictionarySearch()});
 byId('clearSearchTags').onclick=clearSearchTags;
-byId('clearTags').onclick=()=>{extraTags=[];femaleTags=[];maleTags=[];girl2Tags=[];searchAddedTags=emptySearchAdded();refresh()};
+byId('clearTags').onclick=()=>{if(!confirm('共通・キャラ別の追加タグ、貼り付け欄をすべてクリアしますか？絵柄・キャラ名・シーン設定・UCは保持されます。'))return;clearAdditionalTags();refresh();byId('copyStatus').textContent='追加タグをすべてクリアしました。絵柄・キャラ名・シーン設定・UCは保持されています。'};
 byId('jumpMale').onclick=()=>{byId('malePanel').scrollIntoView({behavior:'smooth',block:'start'})};
 byId('jumpExtra').onclick=()=>{byId('extraPanel').scrollIntoView({behavior:'smooth',block:'start'})};
 async function copy(text,label){let ok=false;try{if(navigator.clipboard&&window.isSecureContext){await navigator.clipboard.writeText(text);ok=true}}catch(e){}if(!ok){const t=document.createElement('textarea');t.value=text;t.style.position='fixed';t.style.opacity='0';document.body.appendChild(t);t.focus();t.select();try{ok=document.execCommand('copy')}catch(e){}t.remove()}if(ok){byId('copyStatus').textContent=label+'をコピーしました！'}else{byId('copyStatus').textContent='自動コピーできませんでした。表示された文章を長押ししてコピーしてください。'}return ok}
@@ -1413,7 +1467,7 @@ byId('stylePartsMode').addEventListener('change',refresh);
 byId('undoStyle').addEventListener('click',()=>{if(!prevLook)return;const now=styleFields();for(const [id,value] of Object.entries(prevLook))byId(id).value=value;prevLook=now;lastStyleSnapshot=styleFields();refresh()});
 byId('copyStyleOnly').addEventListener('click',()=>copy(buildStyle(),'絵柄タグ'));
  setupCollapsiblePanels();
-loadState();readCustomLooks();readSnapshots();readFavoriteCollections();renderCustomLooks();renderSnapshots();lastStyleSnapshot=styleFields();refresh();modeUI();renderTagList();renderFavorites();setTagDictMeta('日本語辞書の状態を確認しています…');ensureTagDictionary();
+loadState();readResetUndo();readCustomLooks();readSnapshots();readFavoriteCollections();renderCustomLooks();renderSnapshots();lastStyleSnapshot=styleFields();refresh();modeUI();renderTagList();renderFavorites();setTagDictMeta('日本語辞書の状態を確認しています…');ensureTagDictionary();
 
 </script>
 <script src="./firebase-config.js"></script>
