@@ -352,7 +352,7 @@
    <div class="field full"><label for="favoriteFolderName">新しいフォルダ名</label><input id="favoriteFolderName" type="text" maxlength="40" placeholder="例：髪・瞳 / 東方Project"></div>
    <div class="field"><label for="favoriteFilter">お気に入りを検索</label><input id="favoriteFilter" type="search" placeholder="表示名・英語タグ"></div>
    <div class="field"><label for="favoriteSort">並べ替え</label><select id="favoriteSort"><option value="label">表示名順</option><option value="tag">英語タグ順</option></select></div>
-   <div class="actions full"><button type="button" class="btn primary" id="addFavoriteFolder">フォルダを追加</button><button type="button" class="btn" id="renameFavoriteFolder">表示中のフォルダ名を変更</button><button type="button" class="btn ghost" id="deleteFavoriteFolder">表示中のフォルダを削除</button></div>
+   <div class="actions full"><button type="button" class="btn primary" id="addFavoriteFolder">フォルダを追加</button><button type="button" class="btn" id="addManualFavorite">手動で追加</button><button type="button" class="btn" id="renameFavoriteFolder">表示中のフォルダ名を変更</button><button type="button" class="btn ghost" id="deleteFavoriteFolder">表示中のフォルダを削除</button></div>
   </div>
   <div id="favoriteCollectionsList" aria-live="polite"></div>
  </section>
@@ -366,6 +366,18 @@
   </div>
  </div>
 </div>
+ <div id="manualFavoriteModal" class="favorite-modal hide" role="dialog" aria-modal="true" aria-labelledby="manualFavoriteTitle">
+  <div class="favorite-modal-card">
+   <h3 id="manualFavoriteTitle">お気に入りに手動で追加</h3>
+   <p class="small muted">辞書やDanbooruにないタグも登録できます。英語タグを入力してください。</p>
+   <div class="field"><label for="manualFavoriteTag">英語タグ（必須）</label><input id="manualFavoriteTag" type="text" maxlength="300" placeholder="例：my custom tag" autocomplete="off"></div>
+   <div class="field"><label for="manualFavoriteLabel">日本語表示名（任意）</label><input id="manualFavoriteLabel" type="text" maxlength="80" placeholder="例：自作のタグ名"></div>
+   <div class="field"><label for="manualFavoriteType">保存先カテゴリ</label><select id="manualFavoriteType"><option value="works">作品・キャラクター</option><option value="attributes">属性・構図</option><option value="uncategorized">未分類</option></select></div>
+   <div class="field" id="manualFavoriteFolderWrap"><label for="manualFavoriteFolder">保存先フォルダ</label><select id="manualFavoriteFolder"></select><p class="hint">フォルダがない場合は、先にお気に入り画面から追加してください。</p></div>
+   <p class="small muted" id="manualFavoriteStatus" role="status"></p>
+   <div class="actions"><button type="button" class="btn primary" id="saveManualFavorite">保存</button><button type="button" class="btn ghost" id="closeManualFavorite">キャンセル</button></div>
+  </div>
+ </div>
 <div id="characterFavoritePicker" class="favorite-modal hide" role="dialog" aria-modal="true" aria-labelledby="characterFavoritePickerTitle">
  <div class="favorite-modal-card">
   <h3 id="characterFavoritePickerTitle">お気に入りキャラクターを選択</h3>
@@ -769,9 +781,34 @@ function saveFavoriteChoice(){
  else{const folder=findFavoriteFolder(type,byId('favoriteChooserFolder').value);if(!folder){setFavoriteStatus('先に保存先フォルダを作成してください');return}const list=type==='works'?folder.characters:folder.tags;if(!list.some(x=>normalize(x.tag)===normalize(tag)))list.push(entry);else{const old=list.find(x=>normalize(x.tag)===normalize(tag));old.label=label}}
  if(persistFavoriteCollections()){closeFavoriteChooser();renderFavorites();renderTagList();setFavoriteStatus('お気に入りに保存しました')}
 }
+function setManualFavoriteStatus(message){const field=byId('manualFavoriteStatus');if(field)field.textContent=message;setFavoriteStatus(message)}
+function updateManualFavoriteFolders(){
+ const type=byId('manualFavoriteType').value,wrap=byId('manualFavoriteFolderWrap'),select=byId('manualFavoriteFolder');
+ const needsFolder=type!=='uncategorized';wrap.classList.toggle('hide',!needsFolder);if(!needsFolder){select.replaceChildren();return}
+ folderSelectOptions(select,type);
+}
+function openManualFavorite(){
+ byId('manualFavoriteTag').value='';byId('manualFavoriteLabel').value='';byId('manualFavoriteType').value=byId('favoriteFolderType').value||'attributes';updateManualFavoriteFolders();
+ const current=byId('favoriteFolderSelect').value;if([...byId('manualFavoriteFolder').options].some(option=>option.value===current))byId('manualFavoriteFolder').value=current;
+ byId('manualFavoriteStatus').textContent='';byId('manualFavoriteModal').classList.remove('hide');setTimeout(()=>byId('manualFavoriteTag').focus(),0);
+}
+function closeManualFavorite(){byId('manualFavoriteModal').classList.add('hide')}
+function saveManualFavorite(){
+ const raw=byId('manualFavoriteTag').value.trim();if(!raw){setManualFavoriteStatus('英語タグを入力してください');return}
+ if(/[\r\n,，]/.test(raw)){setManualFavoriteStatus('1つの英語タグを入力してください。複数登録は1件ずつ行います。');return}
+ const tag=raw.replace(/_/g,' '),label=byId('manualFavoriteLabel').value.trim()||tag,type=byId('manualFavoriteType').value;
+ let list=null;
+ if(type==='uncategorized')list=favoriteCollections.uncategorized;
+ else{const folder=findFavoriteFolder(type,byId('manualFavoriteFolder').value);if(!folder){setManualFavoriteStatus('保存先フォルダを選択してください');return}list=type==='works'?folder.characters:folder.tags}
+ if(list.some(entry=>normalize(entry.tag)===normalize(tag))){setManualFavoriteStatus('同じ保存先に同じ英語タグが登録済みです');return}
+ const entry={id:favoriteId('tag'),label:label.slice(0,80),tag:tag.slice(0,300)},previousFavoriteTags=[...favoriteTags];list.push(entry);
+ if(!persistFavoriteCollections()){list.pop();favoriteTags=previousFavoriteTags;return}
+ closeManualFavorite();renderFavorites();renderTagList();setFavoriteStatus('お気に入りに手動登録しました');
+}
 function renderFavoriteEntry(entry,type,folderId){
  const row=document.createElement('div');row.className='favorite-entry';const text=document.createElement('div');text.className='favorite-label';text.textContent=entry.label;const en=document.createElement('span');en.className='favorite-en';en.textContent=entry.tag;text.appendChild(en);row.appendChild(text);
  if(type==='works'){for(const [label,target] of [['キャラ1','character'],['キャラ2','maleCharacter']]){const b=document.createElement('button');b.type='button';b.className='btn';b.textContent=label;b.title=label==='キャラ2'?'現在の男性・女の子モードの入力欄へ適用':'キャラ1の入力欄へ置換';b.onclick=()=>applySavedCharacter(entry.tag,target);row.appendChild(b)}}
+ const add=document.createElement('button');add.type='button';add.className='btn';add.textContent='追加';add.title='現在選択中の追加先へプロンプトタグを追加';add.onclick=()=>addTag(entry.tag,'favorite');row.appendChild(add);
  const cp=document.createElement('button');cp.type='button';cp.className='btn';cp.textContent='コピー';cp.onclick=()=>copyFavoriteTag(entry.tag);row.appendChild(cp);
  const edit=document.createElement('button');edit.type='button';edit.className='btn';edit.textContent='編集';edit.onclick=()=>{const label=prompt('日本語表示名',entry.label),tag=label===null?null:prompt('英語タグ',entry.tag);if(label===null||tag===null||!tag.trim())return;entry.label=label.trim()||tag.trim();entry.tag=tag.trim().replace(/_/g,' ');persistFavoriteCollections();renderFavorites()};row.appendChild(edit);
  const [moveSelect,moveButton]=favoriteMoveControl(entry,type,folderId);row.append(moveSelect,moveButton);
@@ -1080,6 +1117,7 @@ byId('chooseFavoriteCharacter').onclick=openCharacterFavoritePicker;byId('closeC
 byId('favoriteFolderType').addEventListener('change',renderFavorites);
 byId('favoriteFilter').addEventListener('input',renderFavorites);byId('favoriteSort').addEventListener('change',renderFavorites);
 byId('addFavoriteFolder').onclick=addFavoriteFolder;byId('renameFavoriteFolder').onclick=renameFavoriteFolder;byId('deleteFavoriteFolder').onclick=deleteFavoriteFolder;
+byId('addManualFavorite').onclick=openManualFavorite;byId('manualFavoriteType').addEventListener('change',updateManualFavoriteFolders);byId('saveManualFavorite').onclick=saveManualFavorite;byId('closeManualFavorite').onclick=closeManualFavorite;
 byId('favoriteChooserType').addEventListener('change',updateFavoriteChooserFolders);byId('saveFavoriteChoice').onclick=saveFavoriteChoice;byId('closeFavoriteChooser').onclick=closeFavoriteChooser;byId('removeFavoriteChoice').onclick=()=>{if(favoriteChooserState&&removeFavoriteEverywhere(favoriteChooserState.tag)){closeFavoriteChooser();renderFavorites();renderTagList();setFavoriteStatus('お気に入りから削除しました')}};
 
 const stateIds=['character','outfit','pose','scene','expression','camera','viewMode','maleMode','maleCharacter','maleAppearance','maleOutfit','maleAction','maleExtra','girl2Character','girl2Appearance','girl2Outfit','girl2Action','girl2Extra','pasteTags','style','extras','femaleExtras','negative','useQuality','useSolo','stylePartsMode','styleDirectMode','styleDirectTags','styleArtistOther',...partIds];
