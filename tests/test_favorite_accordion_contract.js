@@ -7,6 +7,7 @@ assert(html.includes('const openFavoriteWorkFolders=new Set()'));
 assert(html.includes('function toggleFavoriteWorkFolder(folderId)'));
 assert(html.includes("favorite-folder-toggle"));
 assert(html.includes("favorite-folder-count"));
+assert(html.includes('.favorite-folder.is-collapsed > .favorite-folder-content{display:none}'));
 assert(html.includes("toggle.setAttribute('aria-expanded',String(open))"));
 assert(html.includes("openFavoriteWorkFolders.has(folder.id)"));
 assert(html.includes("source.length+'件'"));
