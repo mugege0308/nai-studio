@@ -101,6 +101,28 @@
   }
   throw Error('この実行環境ではPNG画像を画素解析できません');
  }
+ function concatBytes(parts){const total=parts.reduce((sum,item)=>sum+item.length,0);const out=new Uint8Array(total);let offset=0;for(const item of parts){out.set(item,offset);offset+=item.length}return out}
+ function u32Bytes(value){return new Uint8Array([(value>>>24)&255,(value>>>16)&255,(value>>>8)&255,value&255])}
+ function crc32(data){let crc=0xffffffff;for(const byte of data){crc^=byte;for(let bit=0;bit<8;bit++)crc=(crc>>>1)^((crc&1)?0xedb88320:0)}return (crc^0xffffffff)>>>0}
+ const textEncoder=typeof TextEncoder==='function'?new TextEncoder():null;
+ function encodeUTF8(value){if(!textEncoder)throw Error('UTF-8エンコーダーが利用できません');return textEncoder.encode(value)}
+ function pngChunk(type,data){const typeBytes=encodeUTF8(type),body=concatBytes([typeBytes,data]);return concatBytes([u32Bytes(data.length),body,u32Bytes(crc32(body))])}
+ function asciiJSON(value){return JSON.stringify(value).replace(/[^\x00-\x7f]/g,ch=>{let result='';for(let i=0;i<ch.length;i++)result+='\\u'+ch.charCodeAt(i).toString(16).padStart(4,'0');return result})}
+ function textChunk(key,value){return pngChunk('tEXt',concatBytes([encodeUTF8(key),new Uint8Array([0]),encodeUTF8(value)]))}
+ function pngTextKey(type,data){if(type==='tEXt'||type==='zTXt'||type==='iTXt'){const end=nul(data,0);return end>0?text(data.slice(0,end),type==='iTXt'?'utf-8':'latin1'):''}return ''}
+ function replacePNGTextMetadata(input,metadata){
+  const a=bytes(input);for(let i=0;i<PNG_SIGNATURE.length;i++)if(a[i]!==PNG_SIGNATURE[i])throw Error('PNG形式ではありません');
+  const output=[a.slice(0,8)],replaceKeys=new Set(['Comment','Description','Software']);let offset=8,foundEnd=false;
+  while(offset+12<=a.length){const length=u32(a,offset),start=offset+8,end=start+length,next=end+4;if(end+4>a.length)throw Error('PNGチャンクが途中で終わっています');const type=text(a.slice(offset+4,offset+8),'latin1'),data=a.slice(start,end);if(type!=='IEND'&&!replaceKeys.has(pngTextKey(type,data)))output.push(a.slice(offset,next));if(type==='IEND'){output.push(textChunk('Software','NAI Studio (NovelAI-compatible metadata export)'),textChunk('Comment',asciiJSON(metadata)),a.slice(offset,next));foundEnd=true;break}offset=next}
+  if(!foundEnd)throw Error('PNGのIENDチャンクが見つかりません');return concatBytes(output)
+ }
+ function adler32(data){let a=1,b=0;for(const byte of data){a=(a+byte)%65521;b=(b+a)%65521}return (((b<<16)|a)>>>0)}
+ function createSettingsPNG(metadata){
+  const raw=new Uint8Array([0,255,255,255,0]),compressed=new Uint8Array(2+5+raw.length+4);compressed[0]=0x78;compressed[1]=0x01;compressed[2]=1;compressed[3]=raw.length;compressed[4]=0;const inverse=(~raw.length)&0xffff;compressed[5]=inverse&255;compressed[6]=(inverse>>>8)&255;compressed.set(raw,7);compressed.set(u32Bytes(adler32(raw)),7+raw.length);
+  const ihdr=new Uint8Array(13);ihdr.set(u32Bytes(1),0);ihdr.set(u32Bytes(1),4);ihdr[8]=8;ihdr[9]=6;return concatBytes([PNG_SIGNATURE,pngChunk('IHDR',ihdr),pngChunk('IDAT',compressed),pngChunk('IEND',new Uint8Array())]);
+ }
+ function writeMetadataPNG(input,metadata){return replacePNGTextMetadata(input,metadata)}
+ function createMetadataPNG(metadata){return replacePNGTextMetadata(createSettingsPNG(metadata),metadata)}
  async function read(file){
   if(!file)throw Error('PNGを選択してください');
   const buffer=await file.arrayBuffer();const parsed=await parsePNGTextChunks(buffer);let comment=commentObject(parsed.fields),source='png-text';
@@ -111,5 +133,5 @@
   if(!metadata.isNovelAI&&source==='png-text'&&Object.keys(parsed.fields).length===0)metadata.hasMetadata=false;
   return metadata;
  }
- return {parsePNGTextChunks,parseStealthBytes,extractAlphaBits,normalize,read};
+ return {parsePNGTextChunks,parseStealthBytes,extractAlphaBits,normalize,read,writeMetadataPNG,createMetadataPNG};
 });

@@ -269,9 +269,10 @@
  <p class="small muted">NovelAIで保存したPNGをブラウザ内だけで解析し、確認してから選択項目をフォームへ反映します。画像は外部へ送信しません。</p>
  <div class="actions"><button class="btn primary" type="button" id="chooseMetadataFile">PNGを選ぶ</button><input id="metadataFile" type="file" accept="image/png,.png" hidden><label class="toggle"><input id="metadataInspectOnly" type="checkbox" checked>確認モード（フォームへ反映しない）</label></div>
  <p class="hint">PNGのComment/tEXt情報を優先し、情報がない場合はNovelAI公式のstealth_pngcompも確認します。スクリーンショット、JPEG化、SNS再保存などで情報が失われている場合は復元できません。</p>
+ <div class="field"><label for="seed">Seed（保存・書き出し用）</label><div class="actions"><input id="seed" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="20" placeholder="未設定" autocomplete="off"><button class="btn" type="button" id="copySeed">⧉ Seedをコピー</button><button class="btn ghost" type="button" id="clearSeed">Seedをクリア</button></div><p class="hint">読み込んだSeedはここへ表示されます。未設定の項目はPNGへ追加しません。</p></div>
  <div id="metadataFileInfo" class="metadata-file hide"></div>
  <div id="metadataItems" class="hide"></div>
- <div class="metadata-apply-row"><button class="btn primary" type="button" id="applyMetadata" disabled>選択項目をフォームへ反映</button><button class="btn" type="button" id="restoreMetadata" disabled>適用前の状態に戻す</button><button class="btn ghost" type="button" id="copyMetadataJson" disabled>解析結果をコピー</button></div>
+ <div class="metadata-apply-row"><button class="btn primary" type="button" id="applyMetadata" disabled>選択項目をフォームへ反映</button><button class="btn" type="button" id="restoreMetadata" disabled>適用前の状態に戻す</button><button class="btn ghost" type="button" id="copyMetadataJson" disabled>解析結果をコピー</button><button class="btn primary" type="button" id="exportMetadataPNG">NovelAI互換PNGとして保存</button></div>
  <p class="status" id="metadataStatus" role="status"></p>
 </section>
     <section class="panel" id="snapshotPanel">
@@ -295,7 +296,7 @@
     <div class="field"><label for="settingsPasteBox">コピーした設定データ（JSON）</label><textarea id="settingsPasteBox" rows="5" placeholder="ここに設定データを貼り付け"></textarea></div>
     <div class="actions" style="margin-top:8px"><button class="btn primary" type="button" id="applyPastedSettings">貼り付けた設定を読み込む</button></div>
   </div>
-  <p class="hint">コピーしたJSONはメモ帳にも保管できます。別のPCやブラウザへ移す際は、設定の貼り付け、または下のJSONバックアップ機能を使ってください。NovelAIサイト側のシード・解像度などは含みません。</p>
+  <p class="hint">コピーしたJSONはメモ帳にも保管できます。別のPCやブラウザへ移す際は、設定の貼り付け、または下のJSONバックアップ機能を使ってください。Seedは設定と一緒に保存されます。</p>
   <p id="snapshotStatus" class="status" role="status"></p>
 </section>
 <section class="panel" id="cloudPanel">
@@ -1143,7 +1144,7 @@ byId('addFavoriteFolder').onclick=addFavoriteFolder;byId('renameFavoriteFolder')
 byId('addManualFavorite').onclick=openManualFavorite;byId('manualFavoriteType').addEventListener('change',updateManualFavoriteFolders);byId('saveManualFavorite').onclick=saveManualFavorite;byId('closeManualFavorite').onclick=closeManualFavorite;
 byId('favoriteChooserType').addEventListener('change',updateFavoriteChooserFolders);byId('saveFavoriteChoice').onclick=saveFavoriteChoice;byId('closeFavoriteChooser').onclick=closeFavoriteChooser;byId('removeFavoriteChoice').onclick=()=>{if(favoriteChooserState&&removeFavoriteEverywhere(favoriteChooserState.tag)){closeFavoriteChooser();renderFavorites();renderTagList();setFavoriteStatus('お気に入りから削除しました')}};
 
-const stateIds=['character','outfit','pose','scene','expression','camera','viewMode','maleMode','maleCharacter','maleAppearance','maleOutfit','maleAction','maleExtra','girl2Character','girl2Appearance','girl2Outfit','girl2Action','girl2Extra','pasteTags','style','extras','femaleExtras','negative','useQuality','useSolo','stylePartsMode','styleDirectMode','styleDirectTags','styleArtistOther',...partIds];
+const stateIds=['character','outfit','pose','scene','expression','camera','viewMode','maleMode','maleCharacter','maleAppearance','maleOutfit','maleAction','maleExtra','girl2Character','girl2Appearance','girl2Outfit','girl2Action','girl2Extra','pasteTags','style','extras','femaleExtras','negative','seed','useQuality','useSolo','stylePartsMode','styleDirectMode','styleDirectTags','styleArtistOther',...partIds];
 function saveState(){try{const data={};for(const id of stateIds)data[id]=byId(id).type==='checkbox'?byId(id).checked:byId(id).value;data.extraTags=extraTags;data.femaleTags=femaleTags;data.maleTags=maleTags;data.girl2Tags=girl2Tags;data.searchAddedTags=searchAddedTags;data.panelCollapse=panelCollapseState();localStorage.setItem('nai_prompt_studio_v13',JSON.stringify(data));document.dispatchEvent(new Event('nai:statechanged'))}catch(e){}}
 function loadState(){try{const data=JSON.parse(localStorage.getItem('nai_prompt_studio_v13')||localStorage.getItem('nai_prompt_studio_v12')||localStorage.getItem('nai_prompt_studio_v11')||localStorage.getItem('nai_prompt_studio_v10')||localStorage.getItem('nai_prompt_studio_v9')||localStorage.getItem('nai_prompt_studio_v8')||localStorage.getItem('nai_prompt_studio_v7')||localStorage.getItem('nai_prompt_studio_v6')||localStorage.getItem('nai_prompt_studio_v5')||localStorage.getItem('nai_prompt_studio_v4')||localStorage.getItem('nai_prompt_studio_v1')||'null');if(!data)return;for(const id of stateIds){if(!(id in data))continue;const el=byId(id);if(el.type==='checkbox')el.checked=Boolean(data[id]);else if(el.tagName!=='SELECT'||[...el.options].some(opt=>opt.value===data[id]))el.value=data[id]}extraTags=Array.isArray(data.extraTags)?data.extraTags.filter(x=>typeof x==='string').slice(0,40):[];femaleTags=Array.isArray(data.femaleTags)?data.femaleTags.filter(x=>typeof x==='string').slice(0,40):[];maleTags=Array.isArray(data.maleTags)?data.maleTags.filter(x=>typeof x==='string').slice(0,40):[];girl2Tags=Array.isArray(data.girl2Tags)?data.girl2Tags.filter(x=>typeof x==='string').slice(0,40):[];searchAddedTags=normalizeSearchAdded(data.searchAddedTags);applyPanelCollapse(data.panelCollapse)}catch(e){}}
 function setValues(dict){dict={maleMode:'none',maleCharacter:'',maleAppearance:'',maleOutfit:'',maleAction:'',maleExtra:'',girl2Character:'',girl2Appearance:'',girl2Outfit:'',girl2Action:'',girl2Extra:'',pasteTags:'',femaleExtras:'',...dict};for(const [id,value] of Object.entries(dict)){if(byId(id)){if(byId(id).type==='checkbox')byId(id).checked=Boolean(value);else byId(id).value=value}}extraTags=[];femaleTags=[];maleTags=[];girl2Tags=[];searchAddedTags=emptySearchAdded();refresh();byId('copyStatus').textContent='プリセットを適用しました'}
@@ -1219,7 +1220,7 @@ function applySettings(state){
  lastStyleSnapshot=styleFields();
  refresh();
 }
-let importedNovelAIMetadata=null,metadataImportUndoState=null;
+let importedNovelAIMetadata=null,importedNovelAIImageBytes=null,metadataImportUndoState=null;
 const METADATA_UNDO_KEY='nai_novelai_metadata_undo_v1';
 function metadataStatus(message,warning=false){const el=byId('metadataStatus');if(el){el.textContent=message;el.classList.toggle('metadata-warning',warning)}}
 function metadataText(value){return value===null||value===undefined||value===''?'（なし）':String(value)}
@@ -1228,11 +1229,22 @@ function metadataField(key,label,value,{checked=true,disabled=false,extraClass='
 }
 function metadataCopyPayload(){if(!importedNovelAIMetadata)return '';const m=importedNovelAIMetadata;return JSON.stringify({format:'NAI-Studio-NovelAI-Metadata',source:m.source,sourceLabel:m.sourceLabel,isNovelAI:m.isNovelAI,basePrompt:m.basePrompt,characters:m.characters,negativePrompt:m.negativePrompt,settings:m.settings,fields:m.fields},null,2)}
 function metadataSelection(){return [...document.querySelectorAll('#metadataItems [data-metadata-key]:checked')].map(input=>input.dataset.metadataKey)}
-function updateMetadataApplyState(){const button=byId('applyMetadata');if(!button)return;button.disabled=!importedNovelAIMetadata||!importedNovelAIMetadata.isNovelAI||byId('metadataInspectOnly').checked||!metadataSelection().some(key=>key==='base'||key==='negative'||key.startsWith('character:'))}
+function seedValue(){const value=byId('seed').value.trim();return /^\d+$/.test(value)?value:''}
+function buildNovelAIMetadata(){
+ const prompts=buildPrompts(),raw={metadata_type:'nai-studio-export',exported_by:'NAI Studio',prompt:prompts.base,uc:byId('negative').value.trim(),v4_prompt:{caption:{base_caption:prompts.base,char_captions:[]}},v4_negative_prompt:{caption:{base_caption:byId('negative').value.trim()}},request_type:'NAI-StudioExport'};
+ if(prompts.female.trim())raw.v4_prompt.caption.char_captions.push({char_caption:prompts.female,centers:[]});
+ if(prompts.male.trim())raw.v4_prompt.caption.char_captions.push({char_caption:prompts.male,centers:[]});
+ const currentSeed=seedValue();if(currentSeed)raw.seed=Number(currentSeed)<=Number.MAX_SAFE_INTEGER?Number(currentSeed):currentSeed;
+ const source=importedNovelAIMetadata?.settings||{},sourceRaw=importedNovelAIMetadata?.raw||{};
+ const keys={model:'model_name',width:'width',height:'height',steps:'steps',guidance:'scale',sampler:'sampler',scheduler:'noise_schedule'};
+ for(const [setting,key] of Object.entries(keys))if(source[setting]!==null&&source[setting]!==undefined&&source[setting]!==''&&Object.prototype.hasOwnProperty.call(sourceRaw,key))raw[key]=sourceRaw[key];
+ return raw;
+}
+function updateMetadataApplyState(){const button=byId('applyMetadata');if(!button)return;button.disabled=!importedNovelAIMetadata||!importedNovelAIMetadata.isNovelAI||byId('metadataInspectOnly').checked||!metadataSelection().some(key=>key==='base'||key==='negative'||key==='seed'||key.startsWith('character:'))}
 function renderNovelAIMetadata(meta){
  importedNovelAIMetadata=null;
  const info=byId('metadataFileInfo'),root=byId('metadataItems');info.replaceChildren();root.replaceChildren();info.classList.remove('hide');root.classList.remove('hide');
- const title=document.createElement('strong');title.textContent=(meta.fileName||'選択したPNG')+'：'+(meta.hasMetadata?(meta.isNovelAI?'NovelAI形式を検出':'PNGテキスト情報を検出'):'生成メタデータなし');info.appendChild(title);
+ const title=document.createElement('strong');const studioExport=meta.raw?.metadata_type==='nai-studio-export';title.textContent=(meta.fileName||'選択したPNG')+'：'+(meta.hasMetadata?(studioExport?'NAI Studio書き出し（NovelAI互換）':meta.isNovelAI?'NovelAI形式を検出':'PNGテキスト情報を検出'):'生成メタデータなし');info.appendChild(title);
  const detail=document.createElement('div');detail.className='small muted';detail.textContent=(meta.source==='stealth_pngcomp'?'stealth_pngcomp（アルファLSB）':meta.source==='png-text'?'PNGテキストチャンク':'情報なし')+' · '+(meta.sourceLabel||'出典情報なし');info.appendChild(detail);
  if(!meta.hasMetadata){const p=document.createElement('p');p.className='small metadata-warning';p.textContent='NovelAIの生成情報は見つかりませんでした。元のPNGを使用してください。';info.appendChild(p);byId('applyMetadata').disabled=true;byId('copyMetadataJson').disabled=true;return}
  if(!meta.isNovelAI){const p=document.createElement('p');p.className='small metadata-warning';p.textContent='PNG情報はありますが、NovelAI形式と確認できません。フォームへの反映は行わず、内容の確認・コピーだけ利用してください。';info.appendChild(p)}
@@ -1243,7 +1255,8 @@ function renderNovelAIMetadata(meta){
  root.appendChild(metadataField('base','共通プロンプト → 「タグ直接貼り付け」欄を置換',meta.basePrompt,{checked:Boolean(meta.basePrompt)}));
  const chars=meta.characters||[];if(chars.length){const charTitle=document.createElement('h3');charTitle.className='metadata-subtitle';charTitle.textContent='キャラクタープロンプト（V5の複数人に対応）';root.appendChild(charTitle);chars.forEach((item,index)=>root.appendChild(metadataField('character:'+index,'キャラクター'+item.index+' → '+(index===0?'キャラ1':index===1?'現在のキャラ2欄':'コピーのみ'),item.caption+(item.centers.length?'\n位置: '+item.centers.map(x=>'('+x.x+', '+x.y+')').join(', '):''),{checked:index<2&&Boolean(item.caption),disabled:index>1,extraClass:'metadata-character'})))}
  root.appendChild(metadataField('negative','UC（negative prompt） → UC欄を置換',meta.negativePrompt,{checked:Boolean(meta.negativePrompt)}));
- const unsupported=document.createElement('p');unsupported.className='hint metadata-unsupported';unsupported.textContent='モデル、解像度、Steps、Guidance、Sampler、Seedなどは現在のStudioに対応する入力欄がないため、自動適用しません。上の表示値または解析結果コピーから確認できます。';root.appendChild(unsupported);
+ root.appendChild(metadataField('seed','Seed → Seed欄を置換',meta.settings.seed===null?'':String(meta.settings.seed),{checked:meta.settings.seed!==null}));
+ const unsupported=document.createElement('p');unsupported.className='hint metadata-unsupported';unsupported.textContent='モデル、解像度、Steps、Guidance、Samplerなどは現在のStudioに編集欄がないため自動適用しません。読み込んだPNGから書き出す場合は確認できた値だけを引き継ぎます。';root.appendChild(unsupported);
  importedNovelAIMetadata=meta;byId('copyMetadataJson').disabled=false;updateMetadataApplyState();
 }
 function persistMetadataUndo(){try{if(metadataImportUndoState)sessionStorage.setItem(METADATA_UNDO_KEY,JSON.stringify(metadataImportUndoState));else sessionStorage.removeItem(METADATA_UNDO_KEY)}catch(_){}byId('restoreMetadata').disabled=!metadataImportUndoState}
@@ -1253,12 +1266,19 @@ function applyNovelAIMetadata(){
  const m=importedNovelAIMetadata,keys=metadataSelection(),operations=[],warnings=[];
  if(keys.includes('base')&&m.basePrompt)operations.push(()=>{byId('pasteTags').value=m.basePrompt});
  if(keys.includes('negative')&&m.negativePrompt)operations.push(()=>{byId('negative').value=m.negativePrompt});
+ if(keys.includes('seed')&&m.settings.seed!==null)operations.push(()=>{byId('seed').value=String(m.settings.seed)});
  for(const key of keys.filter(x=>x.startsWith('character:'))){const index=Number(key.split(':')[1]),item=m.characters?.[index];if(!item?.caption)continue;if(index===0)operations.push(()=>{byId('character').value=item.caption});else if(index===1){const mode=byId('maleMode').value;if(mode==='girl2')operations.push(()=>{byId('girl2Character').value=item.caption});else if(mode==='visible'||mode==='faceless')operations.push(()=>{byId('maleCharacter').value=item.caption});else warnings.push('キャラクター2は現在未使用のため、フォームへは反映しません（内容はコピーできます）。')}else warnings.push('キャラクター'+(index+1)+'はStudioの欄がないため、コピーのみ可能です')}
  if(!operations.length){metadataStatus(warnings.join(' ')||'反映できる項目が選択されていません。',true);return}
  if(!confirm('選択したPNG情報で既存の入力欄を置き換えます。適用前の状態は「適用前の状態に戻す」で復元できます。続けますか？'))return;
  metadataImportUndoState=captureSettings();persistMetadataUndo();operations.forEach(fn=>fn());refresh();metadataStatus('選択したNovelAI情報をフォームへ反映しました。'+(warnings.length?' '+warnings.join(' '):''),Boolean(warnings.length));
 }
 function restoreNovelAIMetadata(){if(!metadataImportUndoState)return;if(!confirm('PNG情報を適用する前のフォームへ戻しますか？'))return;const previous=metadataImportUndoState;try{applySettings(previous);metadataImportUndoState=null;persistMetadataUndo();metadataStatus('PNG情報を適用する前の状態へ戻しました')}catch(e){metadataImportUndoState=previous;persistMetadataUndo();metadataStatus('復元できませんでした：'+e.message,true)}}
+function exportNovelAIMetadataPNG(){
+ try{
+  const metadata=buildNovelAIMetadata(),bytes=importedNovelAIImageBytes?NovelAIMetadata.writeMetadataPNG(importedNovelAIImageBytes,metadata):NovelAIMetadata.createMetadataPNG(metadata);
+  const blob=new Blob([bytes],{type:'image/png'}),url=URL.createObjectURL(blob),base=(importedNovelAIMetadata?.fileName||'nai-studio-settings.png').replace(/\.png$/i,'');const a=document.createElement('a');a.href=url;a.download=base+'_nai-studio.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);metadataStatus(importedNovelAIImageBytes?'元画像の画素を維持してPNGメタデータを書き出しました。':'画像なしの設定保存用1×1 PNGを書き出しました。');
+ }catch(error){metadataStatus('PNG書き出しに失敗しました：'+error.message,true)}
+}
 const RESET_UNDO_KEY='nai_prompt_reset_undo_v1';
 let resetUndoState=null;
 function persistResetUndo(){
@@ -1517,17 +1537,20 @@ async function processImageFile(file){
 }
 byId('snapshotImageFile').addEventListener('change',e=>{if(e.target.files?.[0])processImageFile(e.target.files[0]);else replacingSnapshotImageId=null});
 byId('chooseMetadataFile').addEventListener('click',()=>byId('metadataFile').click());
+byId('copySeed').addEventListener('click',()=>{const value=seedValue();if(value)copy(value,'Seed');else metadataStatus('コピーできるSeedが設定されていません。',true)});
+byId('clearSeed').addEventListener('click',()=>{byId('seed').value='';refresh();metadataStatus('Seedをクリアしました')});
 byId('metadataInspectOnly').addEventListener('change',updateMetadataApplyState);
 byId('metadataItems').addEventListener('change',updateMetadataApplyState);
 byId('applyMetadata').addEventListener('click',applyNovelAIMetadata);
 byId('restoreMetadata').addEventListener('click',restoreNovelAIMetadata);
 byId('copyMetadataJson').addEventListener('click',()=>{if(importedNovelAIMetadata)copy(metadataCopyPayload(),'NovelAI解析結果')});
+byId('exportMetadataPNG').addEventListener('click',exportNovelAIMetadataPNG);
 byId('metadataFile').addEventListener('change',async event=>{
  try{
   const file=event.target.files?.[0];if(!file)return;if(file.size>50*1024*1024)throw Error('50MB以下のPNGを選んでください');
   if(file.type!=='image/png'&&!/\.png$/i.test(file.name))throw Error('PNG画像を選んでください');
-  metadataStatus('PNGを解析しています…');const meta=await NovelAIMetadata.read(file);meta.fileName=file.name;renderNovelAIMetadata(meta);metadataStatus(meta.hasMetadata?(meta.isNovelAI?'NovelAIの生成情報を確認できます。反映前に項目を選択してください。':'PNG情報を確認できます。NovelAI形式ではないためフォームへの反映は行いません。'):'生成メタデータは見つかりませんでした。',!meta.hasMetadata||!meta.isNovelAI);
- }catch(error){importedNovelAIMetadata=null;byId('metadataFileInfo').classList.add('hide');byId('metadataItems').classList.add('hide');byId('applyMetadata').disabled=true;byId('copyMetadataJson').disabled=true;metadataStatus('PNG解析に失敗しました：'+error.message,true)}finally{byId('metadataFile').value=''}
+  metadataStatus('PNGを解析しています…');const meta=await NovelAIMetadata.read(file);importedNovelAIImageBytes=new Uint8Array(await file.arrayBuffer());meta.fileName=file.name;renderNovelAIMetadata(meta);metadataStatus(meta.hasMetadata?(meta.isNovelAI?'NovelAIの生成情報を確認できます。反映前に項目を選択してください。':'PNG情報を確認できます。NovelAI形式ではないためフォームへの反映は行いません。'):'生成メタデータは見つかりませんでした。',!meta.hasMetadata||!meta.isNovelAI);
+ }catch(error){importedNovelAIMetadata=null;importedNovelAIImageBytes=null;byId('metadataFileInfo').classList.add('hide');byId('metadataItems').classList.add('hide');byId('applyMetadata').disabled=true;byId('copyMetadataJson').disabled=true;metadataStatus('PNG解析に失敗しました：'+error.message,true)}finally{byId('metadataFile').value=''}
 });
 readMetadataUndo();
 const zone=byId('imageDropZone');

@@ -1,7 +1,7 @@
 const assert = require('assert');
 const fs = require('fs');
 const zlib = require('zlib');
-const { parsePNGTextChunks, normalize, read, parseStealthBytes } = require('../novelai-metadata.js');
+const { parsePNGTextChunks, normalize, read, parseStealthBytes, createMetadataPNG, writeMetadataPNG } = require('../novelai-metadata.js');
 
 const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 function chunk(type, data) {
@@ -13,6 +13,17 @@ function chunk(type, data) {
 }
 function textChunk(key, value) {
   return chunk('tEXt', Buffer.concat([Buffer.from(key, 'latin1'), Buffer.from([0]), Buffer.from(value, 'latin1')]));
+}
+function chunkData(input, wantedType) {
+  let offset = 8;
+  while (offset + 12 <= input.length) {
+    const length = input.readUInt32BE(offset);
+    const type = input.toString('latin1', offset + 4, offset + 8);
+    const data = input.subarray(offset + 8, offset + 8 + length);
+    if (type === wantedType) return data;
+    offset += length + 12;
+  }
+  return null;
 }
 function sampleComment() {
   return JSON.stringify({
@@ -43,12 +54,15 @@ function sampleComment() {
 
 (async () => {
   const html = fs.readFileSync(require.resolve('../index.html'), 'utf8');
-  for (const id of ['metadataPanel', 'chooseMetadataFile', 'metadataInspectOnly', 'applyMetadata', 'restoreMetadata', 'copyMetadataJson']) {
+  for (const id of ['metadataPanel', 'chooseMetadataFile', 'metadataInspectOnly', 'seed', 'copySeed', 'clearSeed', 'applyMetadata', 'restoreMetadata', 'copyMetadataJson', 'exportMetadataPNG']) {
     assert.ok(html.includes(`id="${id}"`), `metadata UI missing: ${id}`);
   }
   assert.ok(html.includes('<script src="./novelai-metadata.js"></script>'));
   assert.ok(html.includes('確認モード（フォームへ反映しない）'));
   assert.ok(html.includes('!importedNovelAIMetadata.isNovelAI'));
+  assert.ok(html.includes("stateIds=['character','outfit'"));
+  assert.ok(html.includes("'negative','seed','useQuality'"));
+  assert.ok(html.includes('function exportNovelAIMetadataPNG()'));
   assert.ok(html.includes("const PANEL_KEYS=['presets','style','character','pov','extraTags','outputs','metadata'"));
   assert.ok(html.includes('「適用前の状態に戻す」で復元できます'));
 
@@ -81,6 +95,21 @@ function sampleComment() {
   const stealthResult = await parseStealthBytes(stealth);
   assert.strictEqual(stealthResult.comment.prompt, 'stealth prompt');
   assert.strictEqual(stealthResult.comment.uc, 'stealth uc');
+
+  const exportMetadata = { metadata_type: 'nai-studio-export', exported_by: 'NAI Studio', seed: 777, prompt: 'base, 青い瞳', uc: 'lowres', v4_prompt: { caption: { base_caption: 'base, 青い瞳', char_captions: [{ char_caption: 'girl, 赤髪', centers: [] }] } }, v4_negative_prompt: { caption: { base_caption: 'lowres' } } };
+  const exported = createMetadataPNG(exportMetadata);
+  assert.deepStrictEqual(zlib.inflateSync(Buffer.from(chunkData(Buffer.from(exported), 'IDAT'))), Buffer.from([0, 255, 255, 255, 0]));
+  const exportedFields = (await parsePNGTextChunks(exported)).fields;
+  assert.strictEqual(exportedFields.Software, 'NAI Studio (NovelAI-compatible metadata export)');
+  assert.strictEqual(JSON.parse(exportedFields.Comment).metadata_type, 'nai-studio-export');
+  assert.strictEqual(JSON.parse(exportedFields.Comment).seed, 777);
+  const roundTrip = await read({ name: 'nai-studio.png', type: 'image/png', arrayBuffer: async () => exported });
+  assert.strictEqual(roundTrip.raw.metadata_type, 'nai-studio-export');
+  assert.strictEqual(roundTrip.settings.seed, 777);
+  assert.strictEqual(roundTrip.basePrompt, 'base, 青い瞳');
+  const rewritten = writeMetadataPNG(exported, { ...exportMetadata, seed: 778 });
+  assert.strictEqual(JSON.parse((await parsePNGTextChunks(rewritten)).fields.Comment).seed, 778);
+  assert.deepStrictEqual(zlib.inflateSync(Buffer.from(chunkData(Buffer.from(rewritten), 'IDAT'))), Buffer.from([0, 255, 255, 255, 0]));
 
   const emptyPng = Buffer.concat([signature, chunk('IEND', '')]);
   const empty = await read({ name: 'empty.png', type: 'image/png', arrayBuffer: async () => emptyPng });
