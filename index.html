@@ -80,6 +80,7 @@
 #imageDropZone:focus-visible{outline:2px solid var(--accent)}
 #imageDropZone.dragover{background:#32314b;border-color:#e9d6a6}
 #draftImagePreview{display:block;max-height:230px;max-width:100%;object-fit:contain;border-radius:10px;margin:9px auto}
+.metadata-panel{border-color:#65618a}.metadata-file{border:1px solid #454765;background:#151728;border-radius:11px;padding:10px;margin-top:10px}.metadata-file strong{display:block;overflow-wrap:anywhere}.metadata-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:10px}.metadata-field{border:1px solid #3e405b;border-radius:9px;padding:8px;background:#1d1e34;min-width:0}.metadata-field label{display:flex;gap:7px;align-items:flex-start;font-size:12px}.metadata-field input{flex:0 0 auto;margin-top:3px;accent-color:var(--accent2);width:17px;height:17px}.metadata-field .metadata-value{display:block;margin-top:4px;color:#d6d1e8;font-size:11px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:130px;overflow:auto}.metadata-subtitle{margin:13px 0 6px;font-size:12px;color:#eee8d8}.metadata-copy{margin-top:6px}.metadata-warning{color:#ffd0a3}.metadata-character{border-left:3px solid #8c87d6;padding-left:9px}.metadata-unsupported{opacity:.85}.metadata-apply-row{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px}.metadata-panel .btn{min-height:40px}.metadata-panel .status{margin-top:8px}@media(max-width:560px){.metadata-summary{grid-template-columns:1fr}}
 .snapshotimage{width:112px;height:112px;object-fit:cover;border-radius:9px;background:#25253a;border:1px solid #55516d;cursor:zoom-in}
 .snapshotitem .snapshotlayout{display:flex;gap:11px;align-items:flex-start}
 .snapshotitem .snapshottext{flex:1;min-width:0}
@@ -263,8 +264,18 @@
 <div class="actions" style="margin-top:8px"><button class="btn ghost" id="exportSettings" type="button">↓ プリセット設定を書き出す</button><button class="btn ghost" id="importSettingsBtn" type="button">↑ 設定を読み込む</button><input id="importSettingsFile" type="file" accept=".json,application/json" hidden></div>
 <p id="copyStatus" class="status" role="status"></p>
 </section>
+<section class="panel metadata-panel" id="metadataPanel">
+ <h2>⑦ NovelAI PNG情報を読み込む</h2>
+ <p class="small muted">NovelAIで保存したPNGをブラウザ内だけで解析し、確認してから選択項目をフォームへ反映します。画像は外部へ送信しません。</p>
+ <div class="actions"><button class="btn primary" type="button" id="chooseMetadataFile">PNGを選ぶ</button><input id="metadataFile" type="file" accept="image/png,.png" hidden><label class="toggle"><input id="metadataInspectOnly" type="checkbox" checked>確認モード（フォームへ反映しない）</label></div>
+ <p class="hint">PNGのComment/tEXt情報を優先し、情報がない場合はNovelAI公式のstealth_pngcompも確認します。スクリーンショット、JPEG化、SNS再保存などで情報が失われている場合は復元できません。</p>
+ <div id="metadataFileInfo" class="metadata-file hide"></div>
+ <div id="metadataItems" class="hide"></div>
+ <div class="metadata-apply-row"><button class="btn primary" type="button" id="applyMetadata" disabled>選択項目をフォームへ反映</button><button class="btn" type="button" id="restoreMetadata" disabled>適用前の状態に戻す</button><button class="btn ghost" type="button" id="copyMetadataJson" disabled>解析結果をコピー</button></div>
+ <p class="status" id="metadataStatus" role="status"></p>
+</section>
     <section class="panel" id="snapshotPanel">
-  <h2>⑦ 設定を残して複製する <span class="pill">NEW</span></h2>
+  <h2>⑧ 設定を残して複製する <span class="pill">NEW</span></h2>
   <p class="small muted">現在のキャラ・絵柄・タグ・共通構図・UCなどを<strong>ひとまとめで保存</strong>。保存した設定は変更されないので、呼び出して一部だけ変えれば別パターンを試せます。</p>
   <div class="field"><label for="snapshotName">保存名（例：ラフ絵柄・男女2人・構図A）</label><input id="snapshotName" type="text" maxlength="48" placeholder="設定セットの名前を付ける" autocomplete="off"></div>
   <div id="imageDropZone" tabindex="0" aria-label="ここに画像をドロップまたはCtrl+Vで貼り付け">🖼 画像をここにドロップ、またはここをクリックして Ctrl+V で貼り付け</div>
@@ -288,7 +299,7 @@
   <p id="snapshotStatus" class="status" role="status"></p>
 </section>
 <section class="panel" id="cloudPanel">
- <h2>⑧ PC・スマホのクラウド同期 <span class="pill">v13</span></h2>
+ <h2>⑨ PC・スマホのクラウド同期 <span class="pill">v13</span></h2>
  <p class="small muted">同じURL・同じアカウントでPCとスマホの設定、画像付き保存セットを同期します。最初だけFirebaseと公開サイトの設定が必要です。<strong>設定していない場合はv12同様にローカル保存で使えます。</strong></p>
  <p class="note" id="cloudAvailability">クラウド接続設定を確認中…</p>
  <div id="cloudLoginArea" class="hide" style="margin-top:12px">
@@ -389,6 +400,7 @@
 <footer class="footer">内蔵辞書は一般的なタグ候補を収録。Danbooruの全件ではありません。オンライン検索結果は英語タグで、登録済みの語には日本語の意味も表示します。利用件数はDanbooru上の件数です。<br>プロンプトの効き方はモデルや設定により変わります。v8では「共通 / 1人目 / 2人目」を別出力できます。パーツ別の絵柄設定は以前気に入った monobe yuri を初期値に設定しています。<br>NovelAIやDanbooruの公式ツールではない個人用テンプレートです。<br>日本語Danbooru検索は内蔵タグ辞書と同義語による変換で実現。未登録語のみ任意で <a href="https://mymemory.translated.net/doc/spec.php" target="_blank" rel="noopener noreferrer">MyMemory</a> の公開翻訳APIを使用します。オフライン翻訳には限界があります。</footer>
 </div>
 <script src="./tag-search-ranking.js"></script>
+<script src="./novelai-metadata.js"></script>
 <script>
 'use strict';
 const opts={
@@ -1207,6 +1219,46 @@ function applySettings(state){
  lastStyleSnapshot=styleFields();
  refresh();
 }
+let importedNovelAIMetadata=null,metadataImportUndoState=null;
+const METADATA_UNDO_KEY='nai_novelai_metadata_undo_v1';
+function metadataStatus(message,warning=false){const el=byId('metadataStatus');if(el){el.textContent=message;el.classList.toggle('metadata-warning',warning)}}
+function metadataText(value){return value===null||value===undefined||value===''?'（なし）':String(value)}
+function metadataField(key,label,value,{checked=true,disabled=false,extraClass=''}={}){
+ const box=document.createElement('div');box.className='metadata-field '+extraClass;const row=document.createElement('label');const input=document.createElement('input');input.type='checkbox';input.dataset.metadataKey=key;input.checked=checked;input.disabled=disabled;const name=document.createElement('span');name.textContent=label;row.append(input,name);box.appendChild(row);const val=document.createElement('span');val.className='metadata-value';val.textContent=metadataText(value);box.appendChild(val);return box;
+}
+function metadataCopyPayload(){if(!importedNovelAIMetadata)return '';const m=importedNovelAIMetadata;return JSON.stringify({format:'NAI-Studio-NovelAI-Metadata',source:m.source,sourceLabel:m.sourceLabel,isNovelAI:m.isNovelAI,basePrompt:m.basePrompt,characters:m.characters,negativePrompt:m.negativePrompt,settings:m.settings,fields:m.fields},null,2)}
+function metadataSelection(){return [...document.querySelectorAll('#metadataItems [data-metadata-key]:checked')].map(input=>input.dataset.metadataKey)}
+function updateMetadataApplyState(){const button=byId('applyMetadata');if(!button)return;button.disabled=!importedNovelAIMetadata||!importedNovelAIMetadata.isNovelAI||byId('metadataInspectOnly').checked||!metadataSelection().some(key=>key==='base'||key==='negative'||key.startsWith('character:'))}
+function renderNovelAIMetadata(meta){
+ importedNovelAIMetadata=null;
+ const info=byId('metadataFileInfo'),root=byId('metadataItems');info.replaceChildren();root.replaceChildren();info.classList.remove('hide');root.classList.remove('hide');
+ const title=document.createElement('strong');title.textContent=(meta.fileName||'選択したPNG')+'：'+(meta.hasMetadata?(meta.isNovelAI?'NovelAI形式を検出':'PNGテキスト情報を検出'):'生成メタデータなし');info.appendChild(title);
+ const detail=document.createElement('div');detail.className='small muted';detail.textContent=(meta.source==='stealth_pngcomp'?'stealth_pngcomp（アルファLSB）':meta.source==='png-text'?'PNGテキストチャンク':'情報なし')+' · '+(meta.sourceLabel||'出典情報なし');info.appendChild(detail);
+ if(!meta.hasMetadata){const p=document.createElement('p');p.className='small metadata-warning';p.textContent='NovelAIの生成情報は見つかりませんでした。元のPNGを使用してください。';info.appendChild(p);byId('applyMetadata').disabled=true;byId('copyMetadataJson').disabled=true;return}
+ if(!meta.isNovelAI){const p=document.createElement('p');p.className='small metadata-warning';p.textContent='PNG情報はありますが、NovelAI形式と確認できません。フォームへの反映は行わず、内容の確認・コピーだけ利用してください。';info.appendChild(p)}
+ const summary=document.createElement('div');summary.className='metadata-summary';
+ for(const [label,value] of [['モデル',meta.settings.model],['解像度',meta.settings.width&&meta.settings.height?meta.settings.width+' × '+meta.settings.height:''],['Steps',meta.settings.steps],['Guidance',meta.settings.guidance],['Sampler',meta.settings.sampler],['Scheduler',meta.settings.scheduler],['Seed',meta.settings.seed],['生成種別',meta.settings.requestType]]){const item=document.createElement('div');item.className='metadata-field metadata-unsupported';const strong=document.createElement('strong');strong.textContent=label;const valueEl=document.createElement('span');valueEl.className='metadata-value';valueEl.textContent=metadataText(value);item.append(strong,valueEl);summary.appendChild(item)}
+ root.appendChild(summary);
+ const baseTitle=document.createElement('h3');baseTitle.className='metadata-subtitle';baseTitle.textContent='フォームへ反映できる項目（選択式）';root.appendChild(baseTitle);
+ root.appendChild(metadataField('base','共通プロンプト → 「タグ直接貼り付け」欄を置換',meta.basePrompt,{checked:Boolean(meta.basePrompt)}));
+ const chars=meta.characters||[];if(chars.length){const charTitle=document.createElement('h3');charTitle.className='metadata-subtitle';charTitle.textContent='キャラクタープロンプト（V5の複数人に対応）';root.appendChild(charTitle);chars.forEach((item,index)=>root.appendChild(metadataField('character:'+index,'キャラクター'+item.index+' → '+(index===0?'キャラ1':index===1?'現在のキャラ2欄':'コピーのみ'),item.caption+(item.centers.length?'\n位置: '+item.centers.map(x=>'('+x.x+', '+x.y+')').join(', '):''),{checked:index<2&&Boolean(item.caption),disabled:index>1,extraClass:'metadata-character'})))}
+ root.appendChild(metadataField('negative','UC（negative prompt） → UC欄を置換',meta.negativePrompt,{checked:Boolean(meta.negativePrompt)}));
+ const unsupported=document.createElement('p');unsupported.className='hint metadata-unsupported';unsupported.textContent='モデル、解像度、Steps、Guidance、Sampler、Seedなどは現在のStudioに対応する入力欄がないため、自動適用しません。上の表示値または解析結果コピーから確認できます。';root.appendChild(unsupported);
+ importedNovelAIMetadata=meta;byId('copyMetadataJson').disabled=false;updateMetadataApplyState();
+}
+function persistMetadataUndo(){try{if(metadataImportUndoState)sessionStorage.setItem(METADATA_UNDO_KEY,JSON.stringify(metadataImportUndoState));else sessionStorage.removeItem(METADATA_UNDO_KEY)}catch(_){}byId('restoreMetadata').disabled=!metadataImportUndoState}
+function readMetadataUndo(){try{const value=JSON.parse(sessionStorage.getItem(METADATA_UNDO_KEY)||'null');metadataImportUndoState=value&&typeof value==='object'&&!Array.isArray(value)?value:null}catch(_){metadataImportUndoState=null}byId('restoreMetadata').disabled=!metadataImportUndoState}
+function applyNovelAIMetadata(){
+ if(!importedNovelAIMetadata)return;if(byId('metadataInspectOnly').checked){metadataStatus('確認モード中です。反映する場合は確認モードをOFFにしてください。',true);return}
+ const m=importedNovelAIMetadata,keys=metadataSelection(),operations=[],warnings=[];
+ if(keys.includes('base')&&m.basePrompt)operations.push(()=>{byId('pasteTags').value=m.basePrompt});
+ if(keys.includes('negative')&&m.negativePrompt)operations.push(()=>{byId('negative').value=m.negativePrompt});
+ for(const key of keys.filter(x=>x.startsWith('character:'))){const index=Number(key.split(':')[1]),item=m.characters?.[index];if(!item?.caption)continue;if(index===0)operations.push(()=>{byId('character').value=item.caption});else if(index===1){const mode=byId('maleMode').value;if(mode==='girl2')operations.push(()=>{byId('girl2Character').value=item.caption});else if(mode==='visible'||mode==='faceless')operations.push(()=>{byId('maleCharacter').value=item.caption});else warnings.push('キャラクター2は現在未使用のため、フォームへは反映しません（内容はコピーできます）。')}else warnings.push('キャラクター'+(index+1)+'はStudioの欄がないため、コピーのみ可能です')}
+ if(!operations.length){metadataStatus(warnings.join(' ')||'反映できる項目が選択されていません。',true);return}
+ if(!confirm('選択したPNG情報で既存の入力欄を置き換えます。適用前の状態は「適用前の状態に戻す」で復元できます。続けますか？'))return;
+ metadataImportUndoState=captureSettings();persistMetadataUndo();operations.forEach(fn=>fn());refresh();metadataStatus('選択したNovelAI情報をフォームへ反映しました。'+(warnings.length?' '+warnings.join(' '):''),Boolean(warnings.length));
+}
+function restoreNovelAIMetadata(){if(!metadataImportUndoState)return;if(!confirm('PNG情報を適用する前のフォームへ戻しますか？'))return;const previous=metadataImportUndoState;try{applySettings(previous);metadataImportUndoState=null;persistMetadataUndo();metadataStatus('PNG情報を適用する前の状態へ戻しました')}catch(e){metadataImportUndoState=previous;persistMetadataUndo();metadataStatus('復元できませんでした：'+e.message,true)}}
 const RESET_UNDO_KEY='nai_prompt_reset_undo_v1';
 let resetUndoState=null;
 function persistResetUndo(){
@@ -1464,6 +1516,20 @@ async function processImageFile(file){
  finally{replacingSnapshotImageId=null;byId('snapshotImageFile').value=''}
 }
 byId('snapshotImageFile').addEventListener('change',e=>{if(e.target.files?.[0])processImageFile(e.target.files[0]);else replacingSnapshotImageId=null});
+byId('chooseMetadataFile').addEventListener('click',()=>byId('metadataFile').click());
+byId('metadataInspectOnly').addEventListener('change',updateMetadataApplyState);
+byId('metadataItems').addEventListener('change',updateMetadataApplyState);
+byId('applyMetadata').addEventListener('click',applyNovelAIMetadata);
+byId('restoreMetadata').addEventListener('click',restoreNovelAIMetadata);
+byId('copyMetadataJson').addEventListener('click',()=>{if(importedNovelAIMetadata)copy(metadataCopyPayload(),'NovelAI解析結果')});
+byId('metadataFile').addEventListener('change',async event=>{
+ try{
+  const file=event.target.files?.[0];if(!file)return;if(file.size>50*1024*1024)throw Error('50MB以下のPNGを選んでください');
+  if(file.type!=='image/png'&&!/\.png$/i.test(file.name))throw Error('PNG画像を選んでください');
+  metadataStatus('PNGを解析しています…');const meta=await NovelAIMetadata.read(file);meta.fileName=file.name;renderNovelAIMetadata(meta);metadataStatus(meta.hasMetadata?(meta.isNovelAI?'NovelAIの生成情報を確認できます。反映前に項目を選択してください。':'PNG情報を確認できます。NovelAI形式ではないためフォームへの反映は行いません。'):'生成メタデータは見つかりませんでした。',!meta.hasMetadata||!meta.isNovelAI);
+ }catch(error){importedNovelAIMetadata=null;byId('metadataFileInfo').classList.add('hide');byId('metadataItems').classList.add('hide');byId('applyMetadata').disabled=true;byId('copyMetadataJson').disabled=true;metadataStatus('PNG解析に失敗しました：'+error.message,true)}finally{byId('metadataFile').value=''}
+});
+readMetadataUndo();
 const zone=byId('imageDropZone');
 zone.addEventListener('click',()=>zone.focus());
 byId('chooseSnapshotImage').addEventListener('click',()=>{replacingSnapshotImageId=null;byId('snapshotImageFile').click()});
@@ -1478,7 +1544,7 @@ function viewSnapshotImage(data,name){
  const close=()=>{backdrop.remove();document.removeEventListener('keydown',esc)};const esc=e=>{if(e.key==='Escape')close()};backdrop.addEventListener('click',close);document.addEventListener('keydown',esc);document.body.appendChild(backdrop);backdrop.focus();
 }
 
-const PANEL_KEYS=['presets','style','character','pov','extraTags','outputs','snapshots','cloud','negative','help','tagSearch'];
+const PANEL_KEYS=['presets','style','character','pov','extraTags','outputs','metadata','snapshots','cloud','negative','help','tagSearch'];
 function setupCollapsiblePanels(){
  const panels=[...document.querySelectorAll('#buildArea section.panel,#tagsArea section.panel')];
  for(const [index,panel] of panels.entries()){
