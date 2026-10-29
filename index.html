@@ -85,6 +85,7 @@
 .snapshotitem .snapshotlayout{display:flex;gap:11px;align-items:flex-start}
 .snapshotitem .snapshottext{flex:1;min-width:0}
 @media(max-width:440px){.snapshotimage{width:86px;height:86px}}
+.snapshot-sort{display:flex;align-items:center;gap:7px}.snapshot-sort select{border:1px solid #44465f;background:#101222;color:var(--ink);border-radius:8px;padding:7px 8px;font-size:11px}.snapshotasset{font-size:11px;color:var(--good);margin:5px 0 0}.snapshotitem .snapshotimage.missing{opacity:.45;cursor:default}
 .panel.collapsible > .panel-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:-2px 0 12px;padding-bottom:8px;border-bottom:1px solid #343750}.panel.collapsible > .panel-heading h2{margin:0;flex:1}.panel-heading .panel-toggle{flex:0 0 auto;border:1px solid #575472;border-radius:9px;background:#25273f;color:var(--ink);padding:6px 9px;font-size:12px;font-weight:700;cursor:pointer}.panel-heading .panel-toggle:focus-visible{outline:2px solid var(--accent);outline-offset:2px}.panel.collapsible.is-collapsed{padding-bottom:12px}.panel.collapsible.is-collapsed > *:not(.panel-heading){display:none}.style-direct-area{margin:10px 0 4px;padding:12px;border:1px solid #575472;border-radius:12px;background:#15162b}.style-direct-area textarea{width:100%;min-height:105px;resize:vertical;border:1px solid #44465f;background:#101222;color:var(--ink);border-radius:9px;padding:10px 11px;line-height:1.55}.style-direct-area textarea::placeholder{color:#7e809b}.panel-heading .pill{margin-left:5px}
 </style>
 <style>
@@ -272,7 +273,7 @@
  <div class="field"><label for="seed">Seed（保存・書き出し用）</label><div class="actions"><input id="seed" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="20" placeholder="未設定" autocomplete="off"><button class="btn" type="button" id="copySeed">⧉ Seedをコピー</button><button class="btn ghost" type="button" id="clearSeed">Seedをクリア</button></div><p class="hint">読み込んだSeedはここへ表示されます。未設定の項目はPNGへ追加しません。</p></div>
  <div id="metadataFileInfo" class="metadata-file hide"></div>
  <div id="metadataItems" class="hide"></div>
- <div class="metadata-apply-row"><button class="btn primary" type="button" id="applyMetadata" disabled>選択項目をフォームへ反映</button><button class="btn" type="button" id="restoreMetadata" disabled>適用前の状態に戻す</button><button class="btn ghost" type="button" id="copyMetadataJson" disabled>解析結果をコピー</button><button class="btn primary" type="button" id="exportMetadataPNG">NovelAI互換PNGとして保存</button></div>
+ <div class="metadata-apply-row"><button class="btn primary" type="button" id="applyMetadata" disabled>選択項目をフォームへ反映</button><button class="btn" type="button" id="restoreMetadata" disabled>適用前の状態に戻す</button><button class="btn ghost" type="button" id="copyMetadataJson" disabled>解析結果をコピー</button><button class="btn primary" type="button" id="exportMetadataPNG">NovelAI互換PNGとして保存</button><button class="btn" type="button" id="saveImportedSnapshot" disabled>画像＋設定セットとして保存</button></div>
  <p class="status" id="metadataStatus" role="status"></p>
 </section>
     <section class="panel" id="snapshotPanel">
@@ -284,10 +285,10 @@
   <input id="snapshotImageFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
   <img id="draftImagePreview" class="hide" alt="保存予定の画像のプレビュー">
   <div class="actions"><button class="btn ghost" id="clearDraftImage" type="button">画像を外す</button><span id="imageStatus" class="small muted"></span></div>
-  <p class="hint">画像は容量を抑えたサムネイルにして設定に添付。原寸大の画像は手元にも保存してね。JSONバックアップにも含まれます。</p>
+  <p class="hint">サムネイルと設定は既存の保存形式で保持し、元画像本体はブラウザのIndexedDBに画像IDで保存します。JSONには互換用サムネイルを含め、Firebase同期時は元画像もStorageへ同期します。</p>
   <div class="actions" style="margin-top:10px"><button class="btn primary" id="saveSnapshot" type="button">★ 現在の設定＋画像を保存</button><button class="btn" id="duplicateCurrent" type="button">⧉ 現在の設定を複製</button></div>
   <hr class="hr">
-  <div class="outheader"><h3 style="margin:0">保存した設定</h3><span class="count" id="snapshotCount">0件</span></div>
+  <div class="outheader"><h3 style="margin:0">保存した画像・設定</h3><div class="snapshot-sort"><label class="tiny muted" for="snapshotSort">並べ替え</label><select id="snapshotSort"><option value="newest">新しい順</option><option value="name">名前順</option><option value="image">画像ありを先頭</option></select><span class="count" id="snapshotCount">0件</span></div></div>
   <div id="snapshotList" class="snapshotlist" aria-live="polite"></div>
   <hr class="hr">
   <h3>設定一式をコピー・移す</h3>
@@ -402,6 +403,7 @@
 </div>
 <script src="./tag-search-ranking.js"></script>
 <script src="./novelai-metadata.js"></script>
+<script src="./image-store.js"></script>
 <script>
 'use strict';
 const opts={
@@ -1191,8 +1193,15 @@ byId('saveDirectLook').addEventListener('click',()=>saveCurrentLook('directSaveL
 const SNAPSHOTS_KEY='nai_prompt_studio_snapshots_v12';
 const PREV_SNAPSHOTS_KEY='nai_prompt_studio_snapshots_v11';
 const MAX_SNAPSHOTS=200;
-let savedSnapshots=[],draftImageData='',replacingSnapshotImageId=null,snapshotStorageError=false;
+let savedSnapshots=[],draftImageData='',draftImageId='',draftImageMeta=null,replacingSnapshotImageId=null,snapshotStorageError=false;
 const isSavedImage=x=>typeof x==='string'&&x.length<450000&&/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(x);
+const isImageId=x=>typeof x==='string'&&/^[A-Za-z0-9_-]{1,160}$/.test(x);
+function cloneJSON(value,max=120000){try{const text=JSON.stringify(value);return text&&text.length<=max?JSON.parse(text):null}catch(e){return null}}
+function normalizeSnapshotMetadata(value){
+ const copy=cloneJSON(value);if(!copy||typeof copy!=='object'||Array.isArray(copy))return null;
+ const out={source:copy.source==='imported'?'imported':'manual',isNovelAI:Boolean(copy.isNovelAI),hasMetadata:Boolean(copy.hasMetadata),sourceLabel:String(copy.sourceLabel||'').slice(0,160),fileName:String(copy.fileName||'').slice(0,160),basePrompt:String(copy.basePrompt||'').slice(0,30000),negativePrompt:String(copy.negativePrompt||'').slice(0,30000),characters:Array.isArray(copy.characters)?copy.characters.slice(0,8):[],settings:copy.settings&&typeof copy.settings==='object'?copy.settings:{},raw:copy.raw&&typeof copy.raw==='object'?copy.raw:null};
+ return cloneJSON(out,120000);
+}
 function captureSettings(){
  const state={};
  for(const id of stateIds){const el=byId(id);state[id]=el.type==='checkbox'?el.checked:el.value}
@@ -1220,7 +1229,7 @@ function applySettings(state){
  lastStyleSnapshot=styleFields();
  refresh();
 }
-let importedNovelAIMetadata=null,importedNovelAIImageBytes=null,metadataImportUndoState=null;
+let importedNovelAIMetadata=null,importedNovelAIImageBytes=null,importedNovelAIFile=null,metadataImportUndoState=null;
 const METADATA_UNDO_KEY='nai_novelai_metadata_undo_v1';
 function metadataStatus(message,warning=false){const el=byId('metadataStatus');if(el){el.textContent=message;el.classList.toggle('metadata-warning',warning)}}
 function metadataText(value){return value===null||value===undefined||value===''?'（なし）':String(value)}
@@ -1279,6 +1288,22 @@ function exportNovelAIMetadataPNG(){
   const blob=new Blob([bytes],{type:'image/png'}),url=URL.createObjectURL(blob),base=(importedNovelAIMetadata?.fileName||'nai-studio-settings.png').replace(/\.png$/i,'');const a=document.createElement('a');a.href=url;a.download=base+'_nai-studio.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);metadataStatus(importedNovelAIImageBytes?'元画像の画素を維持してPNGメタデータを書き出しました。':'画像なしの設定保存用1×1 PNGを書き出しました。');
  }catch(error){metadataStatus('PNG書き出しに失敗しました：'+error.message,true)}
 }
+function metadataSnapshotForSave(){
+ if(!importedNovelAIMetadata)return null;const m=importedNovelAIMetadata;
+ return normalizeSnapshotMetadata({source:'imported',isNovelAI:m.isNovelAI,hasMetadata:m.hasMetadata,sourceLabel:m.sourceLabel,fileName:m.fileName,basePrompt:m.basePrompt,negativePrompt:m.negativePrompt,characters:m.characters,settings:m.settings,raw:m.raw});
+}
+async function saveImportedSnapshot(){
+ if(!importedNovelAIImageBytes||!importedNovelAIFile){metadataStatus('先に保存したいPNGを選んでください。',true);return}
+ if(savedSnapshots.length>=MAX_SNAPSHOTS){metadataStatus('保存上限の200件に達しています。',true);return}
+ const previous={data:draftImageData,id:draftImageId,meta:draftImageMeta};let asset=null;
+ try{
+  const size=await imageDimensions(importedNovelAIFile);const thumb=await compactImage(importedNovelAIFile);asset=await window.NAIImageStore.put(importedNovelAIFile,{name:importedNovelAIFile.name,mimeType:'image/png',width:size.width,height:size.height});
+  setDraftImage(thumb,{...asset,metadata:metadataSnapshotForSave()});
+  const name=byId('snapshotName').value.trim()||importedNovelAIMetadata?.fileName?.replace(/\.png$/i,'')||'読み込んだPNG';
+  if(!saveNamedSnapshot(false,name)){setDraftImage(previous.data,{...(previous.meta||{}),id:previous.id});releaseAssetIfUnused(asset.id);return}
+  metadataStatus('画像本体・サムネイル・現在の設定・読み込んだ生成情報を保存しました。');
+ }catch(error){if(asset)releaseAssetIfUnused(asset.id);setDraftImage(previous.data,{...(previous.meta||{}),id:previous.id});metadataStatus('画像付き保存に失敗しました。既存の保存データは変更していません：'+error.message,true)}
+}
 const RESET_UNDO_KEY='nai_prompt_reset_undo_v1';
 let resetUndoState=null;
 function persistResetUndo(){
@@ -1322,7 +1347,7 @@ function validateSnapshots(input){
  if(!Array.isArray(input))return result;
  for(const snap of input.slice(0,MAX_SNAPSHOTS)){
   if(!snap||typeof snap.name!=='string'||!snap.state||typeof snap.state!=='object'||Array.isArray(snap.state))continue;
-  result.push({id:typeof snap.id==='string'?snap.id.slice(0,120):makeSnapshotId(),name:snap.name.trim().slice(0,48)||'名称未設定',date:typeof snap.date==='string'?snap.date.slice(0,40):new Date().toISOString(),state:snap.state,imageData:isSavedImage(snap.imageData)?snap.imageData:''});
+  result.push({id:typeof snap.id==='string'?snap.id.slice(0,120):makeSnapshotId(),name:snap.name.trim().slice(0,48)||'名称未設定',date:typeof snap.date==='string'?snap.date.slice(0,40):new Date().toISOString(),state:snap.state,imageData:isSavedImage(snap.imageData)?snap.imageData:'',imageId:isImageId(snap.imageId)?snap.imageId:'',imageName:String(snap.imageName||'').slice(0,160),mimeType:String(snap.mimeType||'').slice(0,80),width:Number(snap.width)||0,height:Number(snap.height)||0,metadata:normalizeSnapshotMetadata(snap.metadata)});
  }
  return result;
 }
@@ -1339,17 +1364,21 @@ function uniqueSnapshotName(candidate){
  return `${name} (${n})`;
 }
 function setSnapshotStatus(message){byId('snapshotStatus').textContent=message;byId('copyStatus').textContent=message}
-function saveNamedSnapshot(duplicate=false){
-  if(savedSnapshots.length>=MAX_SNAPSHOTS){setSnapshotStatus('保存上限の200件に達しています。不要な保存を削除するか、JSONバックアップしてください。');return}
- const entered=byId('snapshotName').value.trim();
+function snapshotRecord(id,name,state,imageData,imageId='',meta=null){
+ const asset=meta&&typeof meta==='object'?meta:{};return {id,name,date:new Date().toISOString(),state,imageData:isSavedImage(imageData)?imageData:'',imageId:isImageId(imageId)?imageId:'',imageName:String(asset.name||asset.imageName||'').slice(0,160),mimeType:String(asset.mimeType||'').slice(0,80),width:Number(asset.width)||0,height:Number(asset.height)||0,metadata:normalizeSnapshotMetadata(asset.metadata)}
+}
+function saveNamedSnapshot(duplicate=false,forcedName=''){
+  if(savedSnapshots.length>=MAX_SNAPSHOTS){setSnapshotStatus('保存上限の200件に達しています。不要な保存を削除するか、JSONバックアップしてください。');return false}
+ const entered=forcedName||byId('snapshotName').value.trim();
  const name=uniqueSnapshotName(duplicate?(entered?entered+' - コピー':'設定のコピー'):(entered||'無題の設定'));
- const snap={id:makeSnapshotId(),name,date:new Date().toISOString(),state:captureSettings(),imageData:draftImageData};
- savedSnapshots.unshift(snap);if(!persistSnapshots()){savedSnapshots.shift();return}renderSnapshots();
+ const snap=snapshotRecord(makeSnapshotId(),name,captureSettings(),draftImageData,draftImageId,draftImageMeta);
+ savedSnapshots.unshift(snap);if(!persistSnapshots()){savedSnapshots.shift();releaseAssetIfUnused(snap.imageId);return false}renderSnapshots();
  byId('snapshotName').value=name;
  setSnapshotStatus(`「${name}」を${duplicate?'複製':'保存'}しました。元の設定はそのまま残ります。`);
+ return true;
 }
-function snapshotExport(snap){return JSON.stringify({format:'NAI-Prompt-Studio-Snapshot',version:12,name:snap.name,state:snap.state,imageData:isSavedImage(snap.imageData)?snap.imageData:''},null,2)}
-function copyCurrentSettings(){const name=byId('snapshotName').value.trim()||'現在の設定';copy(snapshotExport({name,state:captureSettings(),imageData:draftImageData}),'設定一式（JSON）')}
+function snapshotExport(snap){return JSON.stringify({format:'NAI-Prompt-Studio-Snapshot',version:13,name:snap.name,state:snap.state,imageData:isSavedImage(snap.imageData)?snap.imageData:'',imageId:isImageId(snap.imageId)?snap.imageId:'',imageName:snap.imageName||'',mimeType:snap.mimeType||'',width:snap.width||0,height:snap.height||0,metadata:normalizeSnapshotMetadata(snap.metadata)},null,2)}
+function copyCurrentSettings(){const name=byId('snapshotName').value.trim()||'現在の設定';copy(snapshotExport({name,state:captureSettings(),imageData:draftImageData,imageId:draftImageId,imageName:draftImageMeta?.name||'',mimeType:draftImageMeta?.mimeType||'',width:draftImageMeta?.width||0,height:draftImageMeta?.height||0,metadata:draftImageMeta?.metadata||null}),'設定一式（JSON）')}
 function loadFromText(){
  try{
   const raw=byId('settingsPasteBox').value.trim();
@@ -1357,7 +1386,7 @@ function loadFromText(){
   const parsed=JSON.parse(raw);
   if(!parsed||!['NAI-Prompt-Studio-Snapshot','NAI-Prompt-Studio-Settings'].includes(parsed.format)||!parsed.state)throw Error('Prompt Studioの設定JSONではありません');
   applySettings(parsed.state);
-  setDraftImage(isSavedImage(parsed.imageData)?parsed.imageData:'');
+  setDraftImage(isSavedImage(parsed.imageData)?parsed.imageData:'',parsed);
   if(typeof parsed.name==='string')byId('snapshotName').value=parsed.name.slice(0,48);
   setSnapshotStatus('コピーした設定を復元しました。保存済みセットは変更していません。');
  }catch(e){setSnapshotStatus('読み込み失敗：'+e.message)}
@@ -1365,33 +1394,40 @@ function loadFromText(){
 function renderSnapshots(){
  const target=byId('snapshotList');target.replaceChildren();
  byId('snapshotCount').textContent=savedSnapshots.length+'件 / 最大'+MAX_SNAPSHOTS+'件';
- if(!savedSnapshots.length){const el=document.createElement('p');el.className='snapshotempty';el.textContent='まだ保存した設定はありません。「現在の設定を保存」で追加できます。';target.appendChild(el);return}
- for(const snap of savedSnapshots){
+ if(!savedSnapshots.length){const el=document.createElement('p');el.className='snapshotempty';el.textContent='まだ保存した画像・設定はありません。';target.appendChild(el);return}
+ const sort=byId('snapshotSort')?.value||'newest';const ordered=[...savedSnapshots].sort((a,b)=>sort==='name'?a.name.localeCompare(b.name,'ja'):(sort==='image'?Number(Boolean(b.imageId||b.imageData))-Number(Boolean(a.imageId||a.imageData)):String(b.date||'').localeCompare(String(a.date||''))));
+ for(const snap of ordered){
   const row=document.createElement('div');row.className='snapshotitem';
   const head=document.createElement('div');head.className='snapshottitle';
   const name=document.createElement('strong');name.textContent=snap.name;
   const date=document.createElement('span');date.className='tiny muted';const d=new Date(snap.date);date.textContent=Number.isNaN(d.getTime())?'':d.toLocaleString('ja-JP');
   head.append(name,date);
   const wrap=document.createElement('div');wrap.className='snapshotlayout';
-  if(isSavedImage(snap.imageData)){const im=document.createElement('img');im.className='snapshotimage';im.loading='lazy';im.decoding='async';im.src=snap.imageData;im.alt=snap.name+'の参考画像';im.title='画像を拡大表示';im.addEventListener('click',()=>viewSnapshotImage(snap.imageData,snap.name));wrap.appendChild(im)}
+  if(isSavedImage(snap.imageData)){const im=document.createElement('img');im.className='snapshotimage';im.loading='lazy';im.decoding='async';im.src=snap.imageData;im.alt=snap.name+'の参考画像';im.title='元画像を表示';im.addEventListener('click',()=>viewSnapshotRecord(snap));wrap.appendChild(im)}else if(snap.imageId){const im=document.createElement('div');im.className='snapshotimage missing';im.textContent='画像';im.title='本体を読み込み中';im.addEventListener('click',()=>viewSnapshotRecord(snap));wrap.appendChild(im)}
   const contents=document.createElement('div');contents.className='snapshottext';contents.appendChild(head);wrap.appendChild(contents);row.appendChild(wrap);
   const detail=document.createElement('p');detail.className='snapshotdetail';
   const character=String(snap.state.character||'キャラ未設定');
   const mode={none:'1人',visible:'男女2人',girl2:'女の子2人',faceless:'男性顔なし',hands:'手だけ',offscreen:'画面外'}[snap.state.maleMode]||'設定済み';
   detail.textContent=character+' · '+mode+' · '+(String(snap.state.extras||'').slice(0,48)||'構図タグなし');contents.appendChild(detail);
+  if(snap.imageId||snap.metadata){const asset=document.createElement('p');asset.className='snapshotasset';asset.textContent=(snap.imageId?'元画像を保存済み':'サムネイルのみ')+(snap.metadata?.isNovelAI?' · NovelAI情報あり':'');contents.appendChild(asset)}
+  if(snap.metadata){const m=snap.metadata,settings=m.settings||{},info=document.createElement('p');info.className='snapshotdetail';info.textContent=[settings.seed!==undefined&&settings.seed!==null?'Seed '+settings.seed:'',settings.model||'',settings.width&&settings.height?settings.width+'×'+settings.height:'',settings.steps?'Steps '+settings.steps:'',settings.guidance?'Guidance '+settings.guidance:'',settings.sampler||''].filter(Boolean).join(' · ')||'保存時の生成情報あり';contents.appendChild(info)}
   const actions=document.createElement('div');actions.className='actions';
   const mk=(title,fn,variant='')=>{const b=document.createElement('button');b.type='button';b.className='btn'+(variant?' '+variant:'');b.textContent=title;b.addEventListener('click',fn);actions.appendChild(b)};
-  mk('呼び出す',()=>{applySettings(snap.state);setDraftImage(snap.imageData||'');byId('snapshotName').value=snap.name;setSnapshotStatus(`「${snap.name}」を呼び出しました。保存元は変わりません。`)},'primary');
-  mk('複製',()=>{if(savedSnapshots.length>=MAX_SNAPSHOTS){setSnapshotStatus('保存上限の200件に達しています');return}const dup={id:makeSnapshotId(),name:uniqueSnapshotName(snap.name+' - コピー'),date:new Date().toISOString(),state:JSON.parse(JSON.stringify(snap.state)),imageData:snap.imageData||''};savedSnapshots.unshift(dup);if(!persistSnapshots()){savedSnapshots.shift();return}renderSnapshots();setSnapshotStatus(`「${dup.name}」を複製しました。`)});
+  mk('呼び出す',()=>{applySettings(snap.state);setDraftImage(snap.imageData||'',snap);byId('snapshotName').value=snap.name;setSnapshotStatus(`「${snap.name}」を呼び出しました。保存元は変わりません。`)},'primary');
+  mk('画像表示',()=>viewSnapshotRecord(snap));
+  mk('複製',()=>{if(savedSnapshots.length>=MAX_SNAPSHOTS){setSnapshotStatus('保存上限の200件に達しています');return}const dup=snapshotRecord(makeSnapshotId(),uniqueSnapshotName(snap.name+' - コピー'),JSON.parse(JSON.stringify(snap.state)),snap.imageData||'',snap.imageId,snap);savedSnapshots.unshift(dup);if(!persistSnapshots()){savedSnapshots.shift();return}renderSnapshots();setSnapshotStatus(`「${dup.name}」を複製しました。`)});
   mk('コピー',()=>copy(snapshotExport(snap),`「${snap.name}」の設定JSON`));
+  if(snap.metadata)mk('生成情報コピー',()=>copy(JSON.stringify(snap.metadata,null,2),`「${snap.name}」の生成情報`));
+  mk('名前変更',()=>{const next=window.prompt('保存名を入力してください',snap.name);if(next===null)return;const clean=next.trim().slice(0,48);if(!clean)return;let final=clean,n=2;while(savedSnapshots.some(x=>x.id!==snap.id&&x.name===final))final=`${clean} (${n++})`;const old=snap.name;snap.name=final;if(!persistSnapshots()){snap.name=old;return}renderSnapshots();setSnapshotStatus(`保存名を「${final}」に変更しました`)});
   mk('画像変更',()=>{replacingSnapshotImageId=snap.id;byId('snapshotImageFile').click()});
-  if(snap.imageData)mk('画像削除',()=>{const old=snap.imageData;snap.imageData='';if(!persistSnapshots())snap.imageData=old;renderSnapshots()},'ghost');
-  mk('削除',()=>{if(!confirm(`「${snap.name}」を削除しますか？`))return;const previous=savedSnapshots;savedSnapshots=savedSnapshots.filter(item=>item.id!==snap.id);if(!persistSnapshots()){savedSnapshots=previous;renderSnapshots();return}renderSnapshots();setSnapshotStatus('保存した設定を削除しました。現在の編集中データはそのままです。')},'ghost');
+  if(snap.imageData||snap.imageId)mk('画像削除',()=>{const old={imageData:snap.imageData,imageId:snap.imageId,imageName:snap.imageName,mimeType:snap.mimeType,width:snap.width,height:snap.height};snap.imageData='';snap.imageId='';snap.imageName='';snap.mimeType='';snap.width=0;snap.height=0;if(!persistSnapshots()){Object.assign(snap,old)}else releaseAssetIfUnused(old.imageId,snap.id);renderSnapshots()},'ghost');
+  mk('削除',()=>{if(!confirm(`「${snap.name}」を削除しますか？`))return;const previous=savedSnapshots;savedSnapshots=savedSnapshots.filter(item=>item.id!==snap.id);if(!persistSnapshots()){savedSnapshots=previous;renderSnapshots();return}releaseAssetIfUnused(snap.imageId);renderSnapshots();setSnapshotStatus('保存した画像・設定を削除しました。現在の編集中データはそのままです。')},'ghost');
   contents.appendChild(actions);target.appendChild(row);
  }
 }
 byId('saveSnapshot').addEventListener('click',()=>saveNamedSnapshot(false));
 byId('duplicateCurrent').addEventListener('click',()=>saveNamedSnapshot(true));
+byId('snapshotSort').addEventListener('change',renderSnapshots);
 byId('copyCurrentSettings').addEventListener('click',copyCurrentSettings);
 byId('togglePasteSettings').addEventListener('click',()=>{byId('pasteSettingsArea').classList.toggle('hide')});
 byId('applyPastedSettings').addEventListener('click',loadFromText);
@@ -1508,8 +1544,15 @@ for(const [btn,id,label] of [['copyLoadedBase','loadedBase','読み込みTXTの�
 byId('restoreImportedSettings').onclick=()=>{if(!importedTextState)return;applySettings(importedTextState);byId('loadedStatus').textContent='フォームの選択項目・タグを保存時の状態に復元しました。※テキスト欄で編集した内容ではなく元の設定です。'};
 byId('downloadImportedText').onclick=()=>saveTextFile(structuredText({base:byId('loadedBase').value,female:byId('loadedFemale').value,male:byId('loadedMale').value},byId('loadedUC').value,null),'nai-v12-edited-prompts.txt');
 
-// v12: attach a compact image thumbnail to each saved setup.
-function setDraftImage(data){draftImageData=isSavedImage(data)?data:'';const im=byId('draftImagePreview');im.classList.toggle('hide',!draftImageData);if(draftImageData)im.src=draftImageData;else im.removeAttribute('src');byId('imageStatus').textContent=draftImageData?'画像の準備OK':'画像なし'}
+// v12: attach a compact image thumbnail to each saved setup. Original bytes use IndexedDB.
+function hasSnapshotAssetRef(id,exceptId=''){return Boolean(id&&savedSnapshots.some(s=>s.id!==exceptId&&s.imageId===id))}
+function releaseAssetIfUnused(id,exceptId=''){if(!isImageId(id)||hasSnapshotAssetRef(id,exceptId)||!window.NAIImageStore)return;window.NAIImageStore.remove(id).catch(()=>{})}
+function setDraftImage(data,asset={}){
+ const oldId=draftImageId;draftImageData=isSavedImage(data)?data:'';draftImageId=isImageId(asset.imageId)?asset.imageId:(isImageId(asset.id)?asset.id:'');
+ draftImageMeta=asset&&typeof asset==='object'?{id:draftImageId,name:String(asset.name||asset.imageName||'').slice(0,160),mimeType:String(asset.mimeType||'').slice(0,80),width:Number(asset.width)||0,height:Number(asset.height)||0,metadata:normalizeSnapshotMetadata(asset.metadata)}:null;
+ if(oldId&&oldId!==draftImageId)releaseAssetIfUnused(oldId);
+ const im=byId('draftImagePreview');im.classList.toggle('hide',!draftImageData);if(draftImageData)im.src=draftImageData;else im.removeAttribute('src');byId('imageStatus').textContent=draftImageData?(draftImageId?'画像本体を保存済み':'画像の準備OK'):'画像なし'
+}
 async function compactImage(file){
  if(!file||!/^image\/(?:png|jpeg|webp|gif)$/.test(file.type))throw Error('PNG・JPEG・WebP・GIFの画像を選んでください');
  if(file.size>25*1024*1024)throw Error('25MB以下の画像を選んでください');
@@ -1525,13 +1568,17 @@ async function compactImage(file){
   if(!isSavedImage(data))throw Error('画像を小さくできませんでした');return data;
  }finally{URL.revokeObjectURL(src)}
 }
+async function imageDimensions(file){
+ const src=URL.createObjectURL(file);try{const im=new Image();await new Promise((resolve,reject)=>{im.onload=resolve;im.onerror=()=>reject(Error('画像サイズを取得できません'));im.src=src});return {width:im.naturalWidth||0,height:im.naturalHeight||0}}finally{URL.revokeObjectURL(src)}
+}
 async function processImageFile(file){
  try{
-  const data=await compactImage(file);
+  const data=await compactImage(file);const size=await imageDimensions(file);let asset=null;
+  try{asset=await window.NAIImageStore.put(file,{name:file.name,mimeType:file.type,width:size.width,height:size.height})}catch(storageError){setSnapshotStatus('元画像本体をIndexedDBへ保存できないため、サムネイルのみ扱います：'+storageError.message,true)}
   if(replacingSnapshotImageId){
    const item=savedSnapshots.find(x=>x.id===replacingSnapshotImageId);if(!item)throw Error('変更対象が見つかりません');
-   const old=item.imageData;item.imageData=data;if(!persistSnapshots()){item.imageData=old;throw Error('保存容量を超えました')}renderSnapshots();setSnapshotStatus(`「${item.name}」の参考画像を変更しました`);
-  }else{setDraftImage(data)}
+   const old={imageData:item.imageData,imageId:item.imageId,imageName:item.imageName,mimeType:item.mimeType,width:item.width,height:item.height};item.imageData=data;item.imageId=asset?.id||'';item.imageName=file.name;item.mimeType=file.type;item.width=size.width;item.height=size.height;if(!persistSnapshots()){Object.assign(item,old);if(asset)releaseAssetIfUnused(asset.id);throw Error('保存容量を超えました')}releaseAssetIfUnused(old.imageId,item.id);renderSnapshots();setSnapshotStatus(`「${item.name}」の参考画像を変更しました`);
+  }else{setDraftImage(data,asset||{name:file.name,mimeType:file.type,width:size.width,height:size.height})}
  }catch(e){byId('imageStatus').textContent='画像エラー：'+e.message;setSnapshotStatus('画像処理エラー：'+e.message)}
  finally{replacingSnapshotImageId=null;byId('snapshotImageFile').value=''}
 }
@@ -1545,12 +1592,13 @@ byId('applyMetadata').addEventListener('click',applyNovelAIMetadata);
 byId('restoreMetadata').addEventListener('click',restoreNovelAIMetadata);
 byId('copyMetadataJson').addEventListener('click',()=>{if(importedNovelAIMetadata)copy(metadataCopyPayload(),'NovelAI解析結果')});
 byId('exportMetadataPNG').addEventListener('click',exportNovelAIMetadataPNG);
+byId('saveImportedSnapshot').addEventListener('click',saveImportedSnapshot);
 byId('metadataFile').addEventListener('change',async event=>{
  try{
   const file=event.target.files?.[0];if(!file)return;if(file.size>50*1024*1024)throw Error('50MB以下のPNGを選んでください');
   if(file.type!=='image/png'&&!/\.png$/i.test(file.name))throw Error('PNG画像を選んでください');
-  metadataStatus('PNGを解析しています…');const meta=await NovelAIMetadata.read(file);importedNovelAIImageBytes=new Uint8Array(await file.arrayBuffer());meta.fileName=file.name;renderNovelAIMetadata(meta);metadataStatus(meta.hasMetadata?(meta.isNovelAI?'NovelAIの生成情報を確認できます。反映前に項目を選択してください。':'PNG情報を確認できます。NovelAI形式ではないためフォームへの反映は行いません。'):'生成メタデータは見つかりませんでした。',!meta.hasMetadata||!meta.isNovelAI);
- }catch(error){importedNovelAIMetadata=null;importedNovelAIImageBytes=null;byId('metadataFileInfo').classList.add('hide');byId('metadataItems').classList.add('hide');byId('applyMetadata').disabled=true;byId('copyMetadataJson').disabled=true;metadataStatus('PNG解析に失敗しました：'+error.message,true)}finally{byId('metadataFile').value=''}
+  metadataStatus('PNGを解析しています…');const meta=await NovelAIMetadata.read(file);importedNovelAIFile=file;importedNovelAIImageBytes=new Uint8Array(await file.arrayBuffer());meta.fileName=file.name;renderNovelAIMetadata(meta);byId('saveImportedSnapshot').disabled=false;metadataStatus(meta.hasMetadata?(meta.isNovelAI?'NovelAIの生成情報を確認できます。反映前に項目を選択してください。':'PNG情報を確認できます。NovelAI形式ではないためフォームへの反映は行いません。'):'生成メタデータがなくても、画像と現在の設定を保存できます。',!meta.hasMetadata||!meta.isNovelAI);
+ }catch(error){importedNovelAIMetadata=null;importedNovelAIImageBytes=null;importedNovelAIFile=null;byId('metadataFileInfo').classList.add('hide');byId('metadataItems').classList.add('hide');byId('applyMetadata').disabled=true;byId('copyMetadataJson').disabled=true;byId('saveImportedSnapshot').disabled=true;metadataStatus('PNG解析に失敗しました：'+error.message,true)}finally{byId('metadataFile').value=''}
 });
 readMetadataUndo();
 const zone=byId('imageDropZone');
@@ -1561,10 +1609,14 @@ zone.addEventListener('dragleave',()=>zone.classList.remove('dragover'));
 zone.addEventListener('drop',e=>{e.preventDefault();zone.classList.remove('dragover');const f=[...e.dataTransfer.files].find(f=>f.type.startsWith('image/'));if(f){replacingSnapshotImageId=null;processImageFile(f)}});
 zone.addEventListener('paste',e=>{const item=[...(e.clipboardData?.items||[])].find(i=>i.type.startsWith('image/'));if(!item)return;e.preventDefault();const f=item.getAsFile();if(f){replacingSnapshotImageId=null;processImageFile(f)}});
 byId('clearDraftImage').onclick=()=>setDraftImage('');
-function viewSnapshotImage(data,name){
+async function viewSnapshotRecord(snap){
+ let data=snap.imageData||'',revoke='';
+ try{if(snap.imageId&&window.NAIImageStore){const asset=await window.NAIImageStore.get(snap.imageId);if(asset?.blob){data=URL.createObjectURL(asset.blob);revoke=data}}if(!data){setSnapshotStatus('元画像本体がこの端末にありません。サムネイルまたはFirebase同期を確認してください。');return}viewSnapshotImage(data,snap.name,revoke)}catch(e){setSnapshotStatus('画像を表示できませんでした：'+e.message)}
+}
+function viewSnapshotImage(data,name,revokeUrl=''){
  const backdrop=document.createElement('div');backdrop.style.cssText='position:fixed;inset:0;z-index:999;background:#000d;display:flex;align-items:center;justify-content:center;padding:22px;cursor:zoom-out';backdrop.tabIndex=0;backdrop.setAttribute('role','dialog');backdrop.setAttribute('aria-label',name+'の画像');
  const img=document.createElement('img');img.src=data;img.alt=name;img.style.cssText='max-width:95vw;max-height:90vh;object-fit:contain;border-radius:12px';backdrop.appendChild(img);
- const close=()=>{backdrop.remove();document.removeEventListener('keydown',esc)};const esc=e=>{if(e.key==='Escape')close()};backdrop.addEventListener('click',close);document.addEventListener('keydown',esc);document.body.appendChild(backdrop);backdrop.focus();
+ const close=()=>{backdrop.remove();document.removeEventListener('keydown',esc);if(revokeUrl)URL.revokeObjectURL(revokeUrl)};const esc=e=>{if(e.key==='Escape')close()};backdrop.addEventListener('click',close);document.addEventListener('keydown',esc);document.body.appendChild(backdrop);backdrop.focus();
 }
 
 const PANEL_KEYS=['presets','style','character','pov','extraTags','outputs','metadata','snapshots','cloud','negative','help','tagSearch'];
@@ -1612,5 +1664,6 @@ loadState();readResetUndo();readCustomLooks();readSnapshots();readFavoriteCollec
 <script src="https://www.gstatic.com/firebasejs/12.11.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.11.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.11.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.11.0/firebase-storage-compat.js"></script>
 <script src="./cloud-sync.js"></script>
 </body></html>

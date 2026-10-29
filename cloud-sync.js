@@ -20,10 +20,10 @@ if(location.protocol!=='https:' && location.hostname!=='localhost' && location.h
  availability.textContent='クラウド同期はHTTPSで公開したサイト、またはlocalhostから使ってください。現在はローカル保存です。';
  return;
 }
-let app,auth,db;
+let app,auth,db,storage=null;
 try{
  app=firebase.apps.length?firebase.app():firebase.initializeApp(cfg);
- auth=app.auth();db=app.database();
+ auth=app.auth();db=app.database();storage=firebase.storage?app.storage():null;
  availability.textContent='Firebaseに接続できます。最初に同期用アカウントでログインしてください。';
 }catch(e){availability.textContent='Firebase初期化エラー：'+e.message;return}
 
@@ -53,9 +53,24 @@ function cleanRemoteSnapObjects(remote){
  const output={};
  for(const [id,item] of Object.entries(remote||{})){
   if(!item||typeof item!=='object'||!item.state)continue;
-  output[id]={id:item.id||id,name:item.name||'設定',date:item.date||'',state:item.state,imageData:item.imageData||''};
+  output[id]={id:item.id||id,name:item.name||'設定',date:item.date||'',state:item.state,imageData:item.imageData||'',imageId:item.imageId||'',imageName:item.imageName||'',mimeType:item.mimeType||'',width:Number(item.width)||0,height:Number(item.height)||0,metadata:item.metadata&&typeof item.metadata==='object'?item.metadata:null};
  }
  return output;
+}
+function assetPath(id){return 'users/'+uid+'/assets/'+encodeURIComponent(String(id))}
+async function uploadSnapshotAsset(item){
+ if(!item?.imageId)return;
+ if(!storage||!window.NAIImageStore)throw new Error('Firebase Storageまたは端末画像ストレージが利用できません');
+ const asset=await window.NAIImageStore.get(item.imageId);if(!asset?.blob)throw new Error(`画像本体が見つかりません：${item.imageName||item.imageId}`);
+ await storage.ref(assetPath(item.imageId)).put(asset.blob,{contentType:item.mimeType||asset.mimeType||'application/octet-stream',customMetadata:{snapshotId:String(item.id||'')}});
+}
+async function hydrateRemoteAssets(items){
+ if(!storage||!window.NAIImageStore||!uid)return;
+ for(const item of Object.values(items||{})){
+  if(!item?.imageId)continue;
+  try{if(await window.NAIImageStore.has(item.imageId))continue;const url=await storage.ref(assetPath(item.imageId)).getDownloadURL();const response=await fetch(url);if(!response.ok)throw new Error('画像本体の取得に失敗しました');const blob=await response.blob();await window.NAIImageStore.put(blob,{id:item.imageId,name:item.imageName,mimeType:item.mimeType,width:item.width,height:item.height})}
+  catch(e){note('設定は同期しましたが、画像本体を取得できませんでした。サムネイルを表示します。',true)}
+ }
 }
 function applyIncomingProfile(value){
  if(!value||!value.state)return;
@@ -84,10 +99,11 @@ function applyIncomingSnapshots(value){
    savedSnapshots=validateSnapshots(Object.values(all).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))));
    if(!saveLocalIncoming()){savedSnapshots=previous;return}
    renderSnapshots();
+   hydrateRemoteAssets(all).then(()=>renderSnapshots()).catch(()=>{});
  }finally{suppress=false}
 }
 function profilePayload(){return {state:captureSettings(),customLooks,favoriteTags,favoriteCollections,draftImageData,updatedAt:firebase.database.ServerValue.TIMESTAMP,source:deviceId}}
-function snapshotsPayload(){const out={};for(const s of savedSnapshots)out[s.id]={id:s.id,name:s.name,date:s.date,state:s.state,imageData:isSavedImage(s.imageData)?s.imageData:''};return out}
+function snapshotsPayload(){const out={};for(const s of savedSnapshots)out[s.id]={id:s.id,name:s.name,date:s.date,state:s.state,imageData:isSavedImage(s.imageData)?s.imageData:'',imageId:s.imageId||'',imageName:s.imageName||'',mimeType:s.mimeType||'',width:s.width||0,height:s.height||0,metadata:s.metadata||null};return out}
 async function pushProfile(){
  if(!active||!profileRef||suppress)return;
  if(!statePending)return;
@@ -107,8 +123,8 @@ async function pushSnapshots(){
    for(const id of Object.keys(remoteSnapshots))if(!current[id])updates.push([id,null]);
    // Write one snapshot per request so 200 image-bearing entries do not become one oversized RTDB update.
    for(const [id,s] of updates){
-    if(s===null){await snapsRef.child(id).remove();delete remoteSnapshots[id]}
-    else{await snapsRef.child(id).set(s);remoteSnapshots[id]=s}
+    if(s===null){const old=remoteSnapshots[id];await snapsRef.child(id).remove();if(storage&&old?.imageId&&!Object.values(current).some(x=>x.imageId===old.imageId))storage.ref(assetPath(old.imageId)).delete().catch(()=>{});delete remoteSnapshots[id]}
+    else{await uploadSnapshotAsset(s);await snapsRef.child(id).set(s);remoteSnapshots[id]=s}
    }
   note('画像付き保存セットをクラウドに同期しました。');
  }catch(e){snapsPending=true;note('保存セットの同期に失敗：'+e.message,true)}
@@ -156,11 +172,11 @@ async function cloudUpload(){
  if(!root)return false;
  // Bulk initial upload is explicit and confirmed; write snapshots individually to avoid oversized single writes.
  const remote=await root.child('snapshots').once('value');
- const existing=Object.keys(remote.val()||{}),items=snapshotsPayload();
+ const remoteItems=remote.val()||{},existing=Object.keys(remoteItems),items=snapshotsPayload();
  await root.child('profile').set(profilePayload());
  // Upload each snapshot separately: avoids oversized multi-megabyte database writes.
- for(const id of existing)if(!items[id])await root.child('snapshots').child(id).remove();
- for(const [id,s] of Object.entries(items))await root.child('snapshots').child(id).set(s);
+ for(const id of existing)if(!items[id]){const old=remoteItems[id];await root.child('snapshots').child(id).remove();if(storage&&old?.imageId&&!Object.values(items).some(item=>item.imageId===old.imageId))storage.ref(assetPath(old.imageId)).delete().catch(()=>{})}
+ for(const [id,s] of Object.entries(items)){await uploadSnapshotAsset(s);await root.child('snapshots').child(id).set(s)}
  remoteSnapshots=items;
  return true;
 }
