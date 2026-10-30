@@ -28,11 +28,28 @@ assert.ok(secondCharacterPanel.includes('data-female-pov="fpovlook"'), 'female P
 assert.ok(!existingPovPanel.includes('data-female-pov='), 'section ④ must not own female POV controls');
 assert.ok(existingPovPanel.includes('data-pov="povhand"'), 'existing male POV controls must remain in section ④');
 
+for (const [value, label] of [['normal', '指定なし'], ['front', '正面向き'], ['side', '横向き'], ['back', '背中を向ける'], ['overShoulder', '背中を向けて振り返る']]) {
+  assert.ok(html.includes(`value="${value}"`), `character 2 facing option missing: ${value}`);
+  assert.ok(html.includes(label), `character 2 facing label missing: ${label}`);
+}
+assert.ok(html.includes('id="character2Facing"'));
+assert.ok(html.includes('id="character2FacingWarning"'));
+
 assert.ok(html.includes("function isFemalePovMode"));
 assert.ok(html.includes('id="character2Pov"'));
 assert.ok(html.includes('function syncCharacter2Pov()'));
 assert.ok(html.includes("kind:'femalePov'"));
 assert.ok(html.includes("return {count:'2girls',tags:femalePov.tags"));
+assert.ok(html.includes("const character2FacingModes"));
+assert.ok(html.includes("front:{tags:'facing viewer'"));
+assert.ok(html.includes("side:{tags:'from side, profile'"));
+assert.ok(html.includes("back:{tags:'from behind, facing away, back to viewer'"));
+assert.ok(html.includes("overShoulder:{tags:'from behind, looking back, over shoulder'"));
+assert.ok(html.includes('function getCharacter2Facing()'));
+assert.ok(html.includes('facingTags:getCharacter2Facing().tags'));
+assert.ok(html.includes('if(comp.facingTags)male.push(comp.facingTags)'));
+assert.ok(html.includes('function character2FacingConflicts(mode)'));
+assert.ok(html.includes('手動タグは保持'));
 assert.ok(html.includes('girl A as first-person camera'));
 assert.ok(html.includes('girl B in front of camera'));
 assert.ok(html.includes("p.kind==='femalePov'?[p.count,p.tags]"), 'female POV must be visible in the preview');
@@ -46,7 +63,7 @@ assert.ok(html.includes('syncViewMode();'));
 
 // The existing state capture path already carries viewMode/maleMode into presets,
 // Firebase state, JSON backup, and structured TXT state.
-assert.ok(html.includes("'viewMode','maleMode','character2Pov'"));
+assert.ok(html.includes("'viewMode','maleMode','character2Pov','character2Facing'"));
 assert.ok(html.includes('state:captureSettings()'));
 assert.ok(html.includes('JSON.stringify({format:\'NAI-Prompt-Studio-TXT-State\''));
 
