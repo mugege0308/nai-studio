@@ -13,6 +13,13 @@ for (const value of ['fpovlook', 'fpovhold', 'fpovhand', 'fpovup', 'fpovdown', '
   assert.ok(html.includes(`value="${value}"`), `female POV option missing: ${value}`);
   assert.ok(html.includes(`data-female-pov="${value}"`), `female POV shortcut missing: ${value}`);
 }
+for (const value of ['fpovlook', 'fpovhold', 'fpovhand', 'fpovup', 'fpovdown', 'fpovbody']) {
+  const start = html.indexOf(`${value}:{tags:`);
+  const end = html.indexOf('\n', start);
+  const definition = html.slice(start, end < 0 ? html.length : end);
+  assert.ok(definition.includes('girl B point of view'), `${value} must use girl B as the camera role`);
+  assert.ok(definition.includes('girl A'), `${value} must keep girl A as the on-screen subject`);
+}
 for (const text of [
   '女性主観・相手を見る',
   '女性主観・相手と手をつなぐ',
@@ -39,7 +46,7 @@ assert.ok(html.includes("function isFemalePovMode"));
 assert.ok(html.includes('id="character2Pov"'));
 assert.ok(html.includes('function syncCharacter2Pov()'));
 assert.ok(html.includes("kind:'femalePov'"));
-assert.ok(html.includes("return {count:'2girls',tags:femalePov.tags"));
+assert.ok(html.includes("return {count:'1girl, solo focus',tags:femalePov.tags"));
 assert.ok(html.includes("const character2FacingModes"));
 assert.ok(html.includes("front:{tags:'facing viewer'"));
 assert.ok(html.includes("side:{tags:'from side, profile'"));
@@ -47,15 +54,20 @@ assert.ok(html.includes("back:{tags:'from behind, facing away, back to viewer'")
 assert.ok(html.includes("overShoulder:{tags:'from behind, looking back, over shoulder'"));
 assert.ok(html.includes('function getCharacter2Facing()'));
 assert.ok(html.includes('facingTags:getCharacter2Facing().tags'));
-assert.ok(html.includes('if(comp.facingTags)male.push(comp.facingTags)'));
+assert.ok(html.includes("if(comp.kind==='femalePov'&&comp.facingTags)female.push(comp.facingTags)"));
+assert.ok(html.includes('cameraPrompt'));
+assert.ok(html.includes('girl B as first-person camera'));
+assert.ok(html.includes('girl A in front of camera'));
+assert.ok(html.includes('function femalePovShowsCameraPart'));
+assert.ok(html.includes('if(femalePovShowsCameraPart())male.push(...girl2Specific())'));
+assert.ok(html.includes("if((comp.kind!=='femalePov'||femalePovShowsCameraPart())&&girl2Tags.length)"));
+assert.ok(!html.includes("female.push('girl A as first-person camera')"), 'camera role must not be assigned to character 1');
+assert.ok(html.includes('画面には1人目の女の子Aが映り、2人目の女の子Bがカメラ側'));
 assert.ok(html.includes('function character2FacingConflicts(mode)'));
 assert.ok(html.includes('手動タグは保持'));
-assert.ok(html.includes('girl A as first-person camera'));
-assert.ok(html.includes('girl B in front of camera'));
 assert.ok(html.includes("p.kind==='femalePov'?[p.count,p.tags]"), 'female POV must be visible in the preview');
 assert.ok(html.includes("p.kind==='femalePov'?p:getPov()"), 'female POV copy must use the active composition');
 assert.ok(html.includes("if(comp.kind==='femalePov'){"));
-assert.ok(html.includes('if(comp.femalePrompt)female.push(comp.femalePrompt)'));
 assert.ok(html.includes("if(isFemalePovMode(mode)){byId('maleMode').value='girl2';byId('viewMode').value='normal'}"));
 assert.ok(html.includes("if(isFemalePovMode()&&mode!=='girl2'){byId('character2Pov').value='normal';byId('viewMode').value='normal'}"));
 assert.ok(html.includes("function migratePovState(state)"));
