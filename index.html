@@ -188,6 +188,7 @@
            <optgroup label="女の子本人の一人称カメラ">
              <option value="fpovlook">女性主観・相手を見る</option>
              <option value="fpovhold">女性主観・相手と手をつなぐ</option>
+             <option value="fpovholdbothback">女性主観・後ろ向きで両手をつなぐ</option>
              <option value="fpovhand">女性主観・自分の手だけ映す</option>
              <option value="fpovup">女性主観・相手を見上げる</option>
              <option value="fpovdown">女性主観・相手を見下ろす</option>
@@ -199,6 +200,7 @@
        <div class="povchoices" id="femalePovChoices">
          <button type="button" data-female-pov="fpovlook">♀️ 相手を見る</button>
          <button type="button" data-female-pov="fpovhold">🤝 手をつなぐ</button>
+         <button type="button" data-female-pov="fpovholdbothback">🙌 後ろ向きで両手をつなぐ</button>
          <button type="button" data-female-pov="fpovhand">🖐 自分の手だけ</button>
          <button type="button" data-female-pov="fpovup">↗ 見上げる</button>
          <button type="button" data-female-pov="fpovdown">↘ 見下ろす</button>
@@ -587,6 +589,7 @@ for(const [value,label] of [['upstream:0','上流：一般タグ'],['upstream:4'
  const femalePovModes={
   fpovlook:{tags:'first-person pov from girl B, girl B point of view, looking at girl A, girl A in front of camera, girl B outside frame, female focus',cameraPrompt:'girl B as first-person camera, offscreen viewpoint'},
   fpovhold:{tags:'first-person pov from girl B, girl B point of view, girl A in front of camera, holding girl B\'s hand, girl B hand holding girl A\'s hand in foreground, girl B outside frame, female focus',cameraPrompt:'girl B as first-person camera, one girl B hand visible in foreground'},
+  fpovholdbothback:{tags:'pov, first-person pov from girl B, girl B point of view, girl A in front of camera, holding hands, both hands visible, left hand, right hand, girl B outside frame, female focus',cameraPrompt:'girl B as first-person camera, only hands visible in foreground, left hand and right hand holding girl A\'s hands',targetPrompt:'standing, reaching back, arms behind back, holding hands',forcedFacing:'back',handsOnly:true,includeCharacter2Details:false},
   fpovhand:{tags:'first-person pov from girl B, girl B point of view, girl A in front of camera, only girl B hand visible in foreground, girl B outside frame, female focus',cameraPrompt:'girl B as first-person camera, only one girl B hand visible in foreground'},
   fpovup:{tags:'first-person pov from girl B, girl B point of view, looking up at girl A, low angle, girl A seen from below, girl B outside frame, female focus',cameraPrompt:'girl B as first-person camera, offscreen viewpoint'},
   fpovdown:{tags:'first-person pov from girl B, girl B point of view, looking down at girl A, high angle, girl A seen from above, girl B outside frame, female focus',cameraPrompt:'girl B as first-person camera, offscreen viewpoint'},
@@ -608,8 +611,10 @@ for(const [value,label] of [['upstream:0','上流：一般タグ'],['upstream:4'
  function getPov(){return povModes[byId('viewMode').value]||povModes.normal}
  function getFemalePov(){return femalePovModes[byId('character2Pov').value]||null}
  function isFemalePovMode(mode=byId('character2Pov').value){return Boolean(femalePovModes[mode])}
- function femalePovShowsCameraPart(mode=byId('character2Pov').value){return ['fpovhold','fpovhand','fpovbody'].includes(mode)}
- function getCharacter2Facing(){return character2FacingModes[byId('character2Facing').value]||character2FacingModes.normal}
+ function femalePovShowsCameraPart(mode=byId('character2Pov').value){return ['fpovhold','fpovholdbothback','fpovhand','fpovbody'].includes(mode)}
+ function femalePovIncludesCharacter2Details(mode=byId('character2Pov').value){return Boolean(femalePovModes[mode]?.includeCharacter2Details!==false&&femalePovShowsCameraPart(mode))}
+ function getEffectiveFacingMode(){return getFemalePov()?.forcedFacing||byId('character2Facing').value}
+ function getCharacter2Facing(){return character2FacingModes[getEffectiveFacingMode()]||character2FacingModes.normal}
  function character2FacingTagsForMode(mode){return ['visible','faceless','girl2'].includes(mode)?getCharacter2Facing().tags:''}
  function manualCharacterFacingText(){
   const femalePov=isFemalePovMode();
@@ -624,6 +629,7 @@ for(const [value,label] of [['upstream:0','上流：一般タグ'],['upstream:4'
   if(isFemalePovMode(copy.viewMode)){if(!isFemalePovMode(copy.character2Pov))copy.character2Pov=copy.viewMode;copy.viewMode='normal'}
   if(!isFemalePovMode(copy.character2Pov))copy.character2Pov='normal';
   if(isFemalePovMode(copy.character2Pov))copy.maleMode='girl2';
+  if(femalePovModes[copy.character2Pov]?.forcedFacing)copy.character2Facing=femalePovModes[copy.character2Pov].forcedFacing;
   if(!Object.prototype.hasOwnProperty.call(character2FacingModes,copy.character2Facing))copy.character2Facing='normal';
   return copy;
  }
@@ -631,7 +637,7 @@ for(const [value,label] of [['upstream:0','上流：一般タグ'],['upstream:4'
 function getComposition(){
   const m=byId('maleMode').value,p=getPov(),femalePov=getFemalePov(),facingTags=character2FacingTagsForMode(m);
   if(femalePov){
-   return {count:'1girl, solo focus',tags:femalePov.tags,kind:'femalePov',cameraPrompt:femalePov.cameraPrompt,facingTags:getCharacter2Facing().tags};
+   return {count:'1girl, solo focus',tags:femalePov.tags,kind:'femalePov',cameraPrompt:femalePov.cameraPrompt,targetPrompt:femalePov.targetPrompt||'',cameraHandsOnly:Boolean(femalePov.handsOnly),facingTags:getCharacter2Facing().tags};
   }
  if(m==='girl2')return {count:'2girls',tags:'both characters visible, two-shot',kind:'girl2',facingTags};
  if(m==='visible')return {count:'1girl, 1boy',tags:'both characters visible',kind:'male',facingTags};
@@ -677,6 +683,7 @@ function buildPrompts(){
  if(pasted)base.push(pasted);
   female.push('girl');
   if(comp.kind==='femalePov'&&comp.facingTags)female.push(comp.facingTags);
+  if(comp.kind==='femalePov'&&comp.targetPrompt)female.push(comp.targetPrompt);
  if(byId('character').value.trim())female.push(byId('character').value.trim());
  for(const id of ['outfit','expression','femaleExtras'])if(byId(id).value.trim())female.push(byId(id).value.trim());
  if(femaleTags.length)female.push(femaleTags.join(', '));
@@ -688,12 +695,12 @@ function buildPrompts(){
    male.push('girl');
    if(comp.kind==='femalePov'){
     if(comp.cameraPrompt)male.push(comp.cameraPrompt);
-    if(femalePovShowsCameraPart())male.push(...girl2Specific());
+    if(femalePovIncludesCharacter2Details())male.push(...girl2Specific());
    }else{
     male.push(...girl2Specific());
     if(comp.facingTags)male.push(comp.facingTags);
    }
-   if((comp.kind!=='femalePov'||femalePovShowsCameraPart())&&girl2Tags.length)male.push(girl2Tags.join(', '));
+   if((comp.kind!=='femalePov'||femalePovIncludesCharacter2Details())&&girl2Tags.length)male.push(girl2Tags.join(', '));
  }
  return {base:base.filter(Boolean).join(',\n'),female:female.filter(Boolean).join(',\n'),male:male.filter(Boolean).join(',\n')};
 }
@@ -712,15 +719,15 @@ function refreshPov(){
  for(const id of ['maleCharacter','maleAppearance','maleOutfit','maleExtra'])byId(id).disabled=!hasMale;
  byId('maleAction').disabled=m==='none'||hasGirl2;
  for(const id of ['girl2Character','girl2Appearance','girl2Outfit','girl2Action','girl2Extra'])byId(id).disabled=!hasGirl2;
-  byId('maleHint').textContent=p.kind==='femalePov'?'女性主観：画面には1人目の女の子Aが映り、2人目の女の子Bがカメラ側です。手や身体の一部を映す場合だけ、キャラ2の設定を反映します。':m==='none'?'2人目を追加すると、専用のキャラクタープロンプトを使えます。':hasGirl2?'2人目の女の子の特徴を「キャラクター2」に出力します。1人目とは別々にコピーできます。':hasMale?'男性の外見・服装・動作を「キャラクター2」に出力します。':'男性を手だけ・画面外にするモードです。外見やキャラ名は出力せず、動作のみ共通に反映します。';
- const parts=p.kind==='femalePov'?[p.cameraPrompt,...(femalePovShowsCameraPart()?girl2Specific():[])]:hasGirl2?girl2Specific():maleSpecific();
+  byId('maleHint').textContent=p.kind==='femalePov'?(p.cameraHandsOnly?'女性主観：画面には1人目の女の子Aが後ろ向きで映り、2人目の女の子Bは両手だけを画面手前に出します。キャラ2の外見・衣装は出力しません。':'女性主観：画面には1人目の女の子Aが映り、2人目の女の子Bがカメラ側です。手や身体の一部を映す場合だけ、キャラ2の設定を反映します。'):m==='none'?'2人目を追加すると、専用のキャラクタープロンプトを使えます。':hasGirl2?'2人目の女の子の特徴を「キャラクター2」に出力します。1人目とは別々にコピーできます。':hasMale?'男性の外見・服装・動作を「キャラクター2」に出力します。':'男性を手だけ・画面外にするモードです。外見やキャラ名は出力せず、動作のみ共通に反映します。';
+  const parts=p.kind==='femalePov'?[p.cameraPrompt,...(femalePovIncludesCharacter2Details()?girl2Specific():[])]:hasGirl2?girl2Specific():maleSpecific();
   byId('malePreview').textContent=m==='none'?'2人目の個別プロンプトなし':[p.count,p.tags,...parts,p.kind==='femalePov'?'':p.facingTags].filter(Boolean).join(', ');
   const facing=byId('character2Facing').value,conflicts=character2FacingConflicts(facing),hasVisibleCharacter2=['visible','faceless','girl2'].includes(m)||p.kind==='femalePov';
   byId('character2FacingWarning').textContent=facing!=='normal'&&!hasVisibleCharacter2?'相手の身体の向きは、画面内に2人目がいる場合だけ出力されます。':conflicts.length?'自動生成の向きと手動タグが競合しています（手動タグは保持）：'+conflicts.join('、'):'';
 }
 function syncCharacter2Pov(){
  const mode=byId('character2Pov').value;
- if(isFemalePovMode(mode)){byId('maleMode').value='girl2';byId('viewMode').value='normal'}
+ if(isFemalePovMode(mode)){byId('maleMode').value='girl2';byId('viewMode').value='normal';if(femalePovModes[mode].forcedFacing)byId('character2Facing').value=femalePovModes[mode].forcedFacing}
  refresh();
 }
 function syncMaleMode(){
@@ -1572,6 +1579,7 @@ for(const id of stateIds){
 byId('maleMode').addEventListener('change',()=>{syncMaleMode();renderTagList()});
 byId('viewMode').addEventListener('change',syncViewMode);
 byId('character2Pov').addEventListener('change',syncCharacter2Pov);
+byId('character2Facing').addEventListener('change',()=>{const forced=getFemalePov()?.forcedFacing;if(forced)byId('character2Facing').value=forced;refresh()});
 byId('clearPastedTags').addEventListener('click',()=>{byId('pasteTags').value='';refresh();byId('copyStatus').textContent='貼り付けタグをクリアしました'});
 byId('resetScene').addEventListener('click',resetScenePrompt);
 byId('resetNewPrompt').addEventListener('click',resetNewPrompt);
