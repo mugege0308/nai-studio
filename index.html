@@ -238,7 +238,7 @@
       <div class="manpreview" id="malePreview" aria-live="polite"></div>
     </section>
     <section class="panel" id="povPanel"><h2>④ 主観・相手の映り方（POV）</h2>
-    <p class="small muted">「女の子が主役、相手は手だけ」の構図を、ほかのシチュや絵柄を壊さず追加できます。POVや相手の見せ方は共通タグ欄と合わせて使うと整理しやすいです。</p>
+    <p class="small muted">「女の子が主役、相手は手だけ」の構図を、ほかのシチュや絵柄を壊さず追加できます。③女性主観と④の構図タグは併用でき、矛盾する男性指定だけ警告します。</p>
     <div class="field"><label for="viewMode">カメラ視点</label><select id="viewMode">
       <option value="normal">通常（指定なし）</option>
       <option value="povhand">主観・画面下から手だけ</option>
@@ -616,6 +616,14 @@ for(const [value,label] of [['upstream:0','上流：一般タグ'],['upstream:4'
  function getEffectiveFacingMode(){return getFemalePov()?.forcedFacing||byId('character2Facing').value}
  function getCharacter2Facing(){return character2FacingModes[getEffectiveFacingMode()]||character2FacingModes.normal}
  function character2FacingTagsForMode(mode){return ['visible','faceless','girl2'].includes(mode)?getCharacter2Facing().tags:''}
+ function femalePovViewOverlay(mode=byId('viewMode').value){
+  if(mode==='normal')return {tags:'',warning:''};
+  if(mode==='povhand')return {tags:'pov hands, one hand reaching from bottom foreground, looking at viewer',warning:''};
+  if(mode==='povhold')return {tags:'pov hands, holding hands, looking at viewer',warning:''};
+  if(mode==='povlook')return {tags:'looking at viewer',warning:''};
+  if(mode==='faceless')return {tags:'',warning:'④「男性の顔を映さない」は女性主観の画面外カメラと重なるため、男性指定タグは女性主観には出力しません。設定は保持しています。'};
+  return {tags:'',warning:'④の構図を女性主観へ変換できないため、設定は保持しつつ自動タグは出力しません。'};
+ }
  function manualCharacterFacingText(){
   const femalePov=isFemalePovMode();
   return [byId('extras').value,femalePov?byId('femaleExtras').value:byId('maleExtra').value,femalePov?'':byId('girl2Extra').value,byId('pasteTags').value,...(femalePov?femaleTags:[...maleTags,...girl2Tags]),...extraTags].filter(Boolean).join(', ').toLowerCase();
@@ -635,9 +643,9 @@ for(const [value,label] of [['upstream:0','上流：一般タグ'],['upstream:4'
  }
 // 男女の人数タグは一か所で管理。手だけの場合、画面外の男性を1boyとして描画させない。
 function getComposition(){
-  const m=byId('maleMode').value,p=getPov(),femalePov=getFemalePov(),facingTags=character2FacingTagsForMode(m);
+  const m=byId('maleMode').value,p=getPov(),femalePov=getFemalePov(),facingTags=character2FacingTagsForMode(m),femaleOverlay=femalePov?femalePovViewOverlay():{tags:'',warning:''};
   if(femalePov){
-   return {count:'1girl, solo focus',tags:femalePov.tags,kind:'femalePov',cameraPrompt:femalePov.cameraPrompt,targetPrompt:femalePov.targetPrompt||'',cameraHandsOnly:Boolean(femalePov.handsOnly),facingTags:getCharacter2Facing().tags};
+   return {count:'1girl, solo focus',tags:[femalePov.tags,femaleOverlay.tags].filter(Boolean).join(', '),kind:'femalePov',cameraPrompt:femalePov.cameraPrompt,targetPrompt:femalePov.targetPrompt||'',cameraHandsOnly:Boolean(femalePov.handsOnly),facingTags:getCharacter2Facing().tags,povWarning:femaleOverlay.warning};
   }
  if(m==='girl2')return {count:'2girls',tags:'both characters visible, two-shot',kind:'girl2',facingTags};
  if(m==='visible')return {count:'1girl, 1boy',tags:'both characters visible',kind:'male',facingTags};
@@ -722,27 +730,35 @@ function refreshPov(){
   byId('maleHint').textContent=p.kind==='femalePov'?(p.cameraHandsOnly?'女性主観：画面には1人目の女の子Aが後ろ向きで映り、2人目の女の子Bは両手だけを画面手前に出します。キャラ2の外見・衣装は出力しません。':'女性主観：画面には1人目の女の子Aが映り、2人目の女の子Bがカメラ側です。手や身体の一部を映す場合だけ、キャラ2の設定を反映します。'):m==='none'?'2人目を追加すると、専用のキャラクタープロンプトを使えます。':hasGirl2?'2人目の女の子の特徴を「キャラクター2」に出力します。1人目とは別々にコピーできます。':hasMale?'男性の外見・服装・動作を「キャラクター2」に出力します。':'男性を手だけ・画面外にするモードです。外見やキャラ名は出力せず、動作のみ共通に反映します。';
   const parts=p.kind==='femalePov'?[p.cameraPrompt,...(femalePovIncludesCharacter2Details()?girl2Specific():[])]:hasGirl2?girl2Specific():maleSpecific();
   byId('malePreview').textContent=m==='none'?'2人目の個別プロンプトなし':[p.count,p.tags,...parts,p.kind==='femalePov'?'':p.facingTags].filter(Boolean).join(', ');
-  const facing=byId('character2Facing').value,conflicts=character2FacingConflicts(facing),hasVisibleCharacter2=['visible','faceless','girl2'].includes(m)||p.kind==='femalePov';
-  byId('character2FacingWarning').textContent=facing!=='normal'&&!hasVisibleCharacter2?'相手の身体の向きは、画面内に2人目がいる場合だけ出力されます。':conflicts.length?'自動生成の向きと手動タグが競合しています（手動タグは保持）：'+conflicts.join('、'):'';
+  const facing=byId('character2Facing').value,conflicts=character2FacingConflicts(facing),hasVisibleCharacter2=['visible','faceless','girl2'].includes(m)||p.kind==='femalePov',warnings=[];
+  if(p.povWarning)warnings.push(p.povWarning);
+  if(facing!=='normal'&&!hasVisibleCharacter2)warnings.push('相手の身体の向きは、画面内に2人目がいる場合だけ出力されます。');
+  if(conflicts.length)warnings.push('自動生成の向きと手動タグが競合しています（手動タグは保持）：'+conflicts.join('、'));
+  byId('character2FacingWarning').textContent=warnings.join(' ');
 }
+let femalePovRestoreState=null,lastCharacter2Pov='normal';
 function syncCharacter2Pov(){
- const mode=byId('character2Pov').value;
- if(isFemalePovMode(mode)){byId('maleMode').value='girl2';byId('viewMode').value='normal';if(femalePovModes[mode].forcedFacing)byId('character2Facing').value=femalePovModes[mode].forcedFacing}
+ const mode=byId('character2Pov').value,wasFemale=isFemalePovMode(lastCharacter2Pov);
+ if(isFemalePovMode(mode)){
+  if(!wasFemale&&!femalePovRestoreState)femalePovRestoreState={maleMode:byId('maleMode').value,viewMode:byId('viewMode').value};
+  byId('maleMode').value='girl2';if(femalePovModes[mode].forcedFacing)byId('character2Facing').value=femalePovModes[mode].forcedFacing;
+ }else if(wasFemale&&femalePovRestoreState){
+  const restore=femalePovRestoreState;femalePovRestoreState=null;byId('maleMode').value=restore.maleMode;byId('viewMode').value=restore.viewMode;
+ }
+ lastCharacter2Pov=mode;
  refresh();
 }
 function syncMaleMode(){
  const mode=byId('maleMode').value;
-  if(isFemalePovMode()&&mode!=='girl2'){byId('character2Pov').value='normal';byId('viewMode').value='normal'}
+  if(isFemalePovMode()&&mode!=='girl2'){byId('character2Pov').value='normal';lastCharacter2Pov='normal';femalePovRestoreState=null}
   if(!isFemalePovMode()&&(mode==='visible'||mode==='faceless'||mode==='none'||mode==='offscreen'||mode==='girl2'))byId('viewMode').value='normal';
  if(mode==='hands'&&!['povhand','povhold'].includes(byId('viewMode').value))byId('viewMode').value='povhand';
  refresh();
 }
 function syncViewMode(){
  const mode=byId('viewMode').value;
-  if(mode!=='normal'&&isFemalePovMode())byId('character2Pov').value='normal';
-  if(isFemalePovMode()&&mode==='normal'){
-   if(!['visible','girl2'].includes(byId('maleMode').value))byId('maleMode').value='visible';
-  }else if(mode==='povhand'||mode==='povhold')byId('maleMode').value='hands';
+  if(isFemalePovMode()){byId('maleMode').value='girl2';refresh();return}
+  if(mode==='povhand'||mode==='povhold')byId('maleMode').value='hands';
   else if(mode==='faceless')byId('maleMode').value='faceless';
   else if(mode==='povlook')byId('maleMode').value='offscreen';
   else if(!isFemalePovMode()&&byId('maleMode').value!=='visible'&&byId('maleMode').value!=='girl2')byId('maleMode').value='none';
@@ -759,6 +775,7 @@ function refresh(){
  byId('secondOutputTitle').textContent=byId('maleMode').value==='girl2'?'③ 女の子2人目 / キャラクター2':'③ 男性 / キャラクター2';
  byId('maleOutputHint').textContent=maleIndividual?'NovelAIの2番目のキャラクター欄へ貼り付け。':'2人目なし・手だけ・画面外のときは個別欄が不要です。';
  renderChips();refreshStyleView();refreshPov();saveState();
+ lastCharacter2Pov=byId('character2Pov').value;
 }
 function renderChips(){
  const p=byId('selectedTags');p.replaceChildren();
