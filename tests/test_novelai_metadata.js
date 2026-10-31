@@ -1,7 +1,7 @@
 const assert = require('assert');
 const fs = require('fs');
 const zlib = require('zlib');
-const { parsePNGTextChunks, normalize, read, parseStealthBytes, createMetadataPNG, writeMetadataPNG } = require('../novelai-metadata.js');
+const { parsePNGTextChunks, normalize, read, parseStealthBytes, createMetadataPNG, writeMetadataPNG, stripPublicMetadata } = require('../novelai-metadata.js');
 
 const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 function chunk(type, data) {
@@ -54,7 +54,7 @@ function sampleComment() {
 
 (async () => {
   const html = fs.readFileSync(require.resolve('../index.html'), 'utf8');
-  for (const id of ['metadataPanel', 'chooseMetadataFile', 'metadataInspectOnly', 'seed', 'copySeed', 'clearSeed', 'applyMetadata', 'restoreMetadata', 'copyMetadataJson', 'exportMetadataPNG']) {
+  for (const id of ['metadataPanel', 'chooseMetadataFile', 'metadataInspectOnly', 'seed', 'copySeed', 'clearSeed', 'applyMetadata', 'restoreMetadata', 'copyMetadataJson', 'exportMetadataPNG', 'exportPublicPNG']) {
     assert.ok(html.includes(`id="${id}"`), `metadata UI missing: ${id}`);
   }
   assert.ok(html.includes('<script src="./novelai-metadata.js"></script>'));
@@ -63,6 +63,8 @@ function sampleComment() {
   assert.ok(html.includes("stateIds=['character','outfit'"));
   assert.ok(html.includes("'negative','seed','useQuality'"));
   assert.ok(html.includes('function exportNovelAIMetadataPNG()'));
+  assert.ok(html.includes('async function exportPublicPNG()'));
+  assert.ok(html.includes('公開用PNGを保存（生成情報なし）'));
   assert.ok(html.includes("const PANEL_KEYS=['presets','style','character','pov','extraTags','outputs','metadata'"));
   assert.ok(html.includes('「適用前の状態に戻す」で復元できます'));
 
@@ -110,6 +112,12 @@ function sampleComment() {
   const rewritten = writeMetadataPNG(exported, { ...exportMetadata, seed: 778 });
   assert.strictEqual(JSON.parse((await parsePNGTextChunks(rewritten)).fields.Comment).seed, 778);
   assert.deepStrictEqual(zlib.inflateSync(Buffer.from(chunkData(Buffer.from(rewritten), 'IDAT'))), Buffer.from([0, 255, 255, 255, 0]));
+
+  const publicPng = stripPublicMetadata(exported);
+  const publicFields = (await parsePNGTextChunks(publicPng)).fields;
+  assert.deepStrictEqual(publicFields, {});
+  assert.strictEqual((await read({ name: 'sample_public.png', type: 'image/png', arrayBuffer: async () => publicPng })).hasMetadata, false);
+  assert.ok(Buffer.from(publicPng).includes(Buffer.from('IDAT')));
 
   const emptyPng = Buffer.concat([signature, chunk('IEND', '')]);
   const empty = await read({ name: 'empty.png', type: 'image/png', arrayBuffer: async () => emptyPng });

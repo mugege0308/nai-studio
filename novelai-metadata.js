@@ -123,6 +123,38 @@
  }
  function writeMetadataPNG(input,metadata){return replacePNGTextMetadata(input,metadata)}
  function createMetadataPNG(metadata){return replacePNGTextMetadata(createSettingsPNG(metadata),metadata)}
+ function stripPublicMetadata(input){
+  const a=bytes(input);for(let i=0;i<PNG_SIGNATURE.length;i++)if(a[i]!==PNG_SIGNATURE[i])throw Error('PNG形式ではありません');
+  const output=[a.slice(0,8)];let offset=8,foundEnd=false;
+  const removable=new Set(['tEXt','zTXt','iTXt','eXIf']);
+  while(offset+12<=a.length){
+   const length=u32(a,offset),start=offset+8,end=start+length,next=end+4;
+   if(end+4>a.length)throw Error('PNGチャンクが途中で終わっています');
+   const type=text(a.slice(offset+4,offset+8),'latin1');
+   if(!removable.has(type))output.push(a.slice(offset,next));
+   offset=next;if(type==='IEND'){foundEnd=true;break}
+  }
+  if(!foundEnd)throw Error('PNGのIENDチャンクが見つかりません');return concatBytes(output)
+ }
+ async function encodeRGBA(rgba,width,height){
+  let canvas=typeof OffscreenCanvas==='function'?new OffscreenCanvas(width,height):null;
+  if(!canvas&&typeof document!=='undefined'){canvas=document.createElement('canvas');canvas.width=width;canvas.height=height}
+  if(!canvas)throw Error('この実行環境ではPNG画像を書き出せません');
+  const ctx=canvas.getContext('2d',{willReadFrequently:true});if(!ctx)throw Error('画像を書き出せません');
+  const imageData=typeof ImageData==='function'?new ImageData(new Uint8ClampedArray(rgba),width,height):ctx.createImageData(width,height);
+  if(!(typeof ImageData==='function'))imageData.data.set(rgba);ctx.putImageData(imageData,0,0);
+  let blob=null;
+  if(typeof canvas.convertToBlob==='function')blob=await canvas.convertToBlob({type:'image/png'});
+  else if(typeof canvas.toBlob==='function')blob=await new Promise((resolve,reject)=>canvas.toBlob(value=>value?resolve(value):reject(Error('PNGを書き出せません')),'image/png'));
+  if(!blob)throw Error('PNGを書き出せません');return new Uint8Array(await blob.arrayBuffer());
+ }
+ async function createPublicPNG(input){
+  const source=input instanceof Blob?input:new Blob([bytes(input)],{type:'image/png'});
+  const image=await imageRGBA(source),rgba=new Uint8ClampedArray(image.data);
+  let hasStealth=false;try{hasStealth=Boolean(await parseStealthBytes(extractAlphaBits(rgba,image.width,image.height)))}catch(_){}
+  if(hasStealth)for(let i=3;i<rgba.length;i+=4)rgba[i]&=0xfe;
+  return stripPublicMetadata(await encodeRGBA(rgba,image.width,image.height));
+ }
  async function read(file){
   if(!file)throw Error('PNGを選択してください');
   const buffer=await file.arrayBuffer();const parsed=await parsePNGTextChunks(buffer);let comment=commentObject(parsed.fields),source='png-text';
@@ -133,5 +165,5 @@
   if(!metadata.isNovelAI&&source==='png-text'&&Object.keys(parsed.fields).length===0)metadata.hasMetadata=false;
   return metadata;
  }
- return {parsePNGTextChunks,parseStealthBytes,extractAlphaBits,normalize,read,writeMetadataPNG,createMetadataPNG};
+ return {parsePNGTextChunks,parseStealthBytes,extractAlphaBits,normalize,read,writeMetadataPNG,createMetadataPNG,stripPublicMetadata,createPublicPNG};
 });

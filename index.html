@@ -308,7 +308,7 @@
  <div class="field"><label for="seed">Seed（保存・書き出し用）</label><div class="actions"><input id="seed" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="20" placeholder="未設定" autocomplete="off"><button class="btn" type="button" id="copySeed">⧉ Seedをコピー</button><button class="btn ghost" type="button" id="clearSeed">Seedをクリア</button></div><p class="hint">読み込んだSeedはここへ表示されます。未設定の項目はPNGへ追加しません。</p></div>
  <div id="metadataFileInfo" class="metadata-file hide"></div>
  <div id="metadataItems" class="hide"></div>
- <div class="metadata-apply-row"><button class="btn primary" type="button" id="applyMetadata" disabled>選択項目をフォームへ反映</button><button class="btn" type="button" id="restoreMetadata" disabled>適用前の状態に戻す</button><button class="btn ghost" type="button" id="copyMetadataJson" disabled>解析結果をコピー</button><button class="btn primary" type="button" id="exportMetadataPNG">NovelAI互換PNGとして保存</button><button class="btn" type="button" id="saveImportedSnapshot" disabled>画像＋設定セットとして保存</button></div>
+ <div class="metadata-apply-row"><button class="btn primary" type="button" id="applyMetadata" disabled>選択項目をフォームへ反映</button><button class="btn" type="button" id="restoreMetadata" disabled>適用前の状態に戻す</button><button class="btn ghost" type="button" id="copyMetadataJson" disabled>解析結果をコピー</button><button class="btn primary" type="button" id="exportMetadataPNG">NovelAI互換PNGとして保存</button><button class="btn" type="button" id="exportPublicPNG">公開用PNGを保存（生成情報なし）</button><button class="btn" type="button" id="saveImportedSnapshot" disabled>画像＋設定セットとして保存</button></div>
  <p class="status" id="metadataStatus" role="status"></p>
 </section>
     <section class="panel" id="snapshotPanel">
@@ -1395,6 +1395,20 @@ function exportNovelAIMetadataPNG(){
   const blob=new Blob([bytes],{type:'image/png'}),url=URL.createObjectURL(blob),base=(importedNovelAIMetadata?.fileName||'nai-studio-settings.png').replace(/\.png$/i,'');const a=document.createElement('a');a.href=url;a.download=base+'_nai-studio.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);metadataStatus(importedNovelAIImageBytes?'元画像の画素を維持してPNGメタデータを書き出しました。':'画像なしの設定保存用1×1 PNGを書き出しました。');
  }catch(error){metadataStatus('PNG書き出しに失敗しました：'+error.message,true)}
 }
+async function exportPublicPNG(){
+ if(!importedNovelAIFile||!importedNovelAIImageBytes){metadataStatus('先に公開用に保存したいPNGを選んでください。',true);return}
+ try{
+  metadataStatus('公開用PNGを作成しています…');
+  const bytes=await NovelAIMetadata.createPublicPNG(importedNovelAIImageBytes),blob=new Blob([bytes],{type:'image/png'});
+  const verification=await NovelAIMetadata.read(blob);
+  if(verification.hasMetadata)throw Error('生成情報を除去できませんでした');
+  const before=await imageDimensions(importedNovelAIFile),after=await imageDimensions(blob);
+  if(before.width!==after.width||before.height!==after.height)throw Error('画像サイズを維持できませんでした');
+  const url=URL.createObjectURL(blob),sourceName=importedNovelAIFile.name||'image.png',base=sourceName.replace(/\.png$/i,'')||'image';
+  const a=document.createElement('a');a.href=url;a.download=base+'_public.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  metadataStatus('公開用PNGを保存しました。生成情報なし・'+after.width+'×'+after.height+'・元画像は変更していません。');
+ }catch(error){metadataStatus('公開用PNGの保存に失敗しました：'+error.message,true)}
+}
 function metadataSnapshotForSave(){
  if(!importedNovelAIMetadata)return null;const m=importedNovelAIMetadata;
  return normalizeSnapshotMetadata({source:'imported',isNovelAI:m.isNovelAI,hasMetadata:m.hasMetadata,sourceLabel:m.sourceLabel,fileName:m.fileName,basePrompt:m.basePrompt,negativePrompt:m.negativePrompt,characters:m.characters,settings:m.settings,raw:m.raw});
@@ -1702,6 +1716,7 @@ byId('applyMetadata').addEventListener('click',applyNovelAIMetadata);
 byId('restoreMetadata').addEventListener('click',restoreNovelAIMetadata);
 byId('copyMetadataJson').addEventListener('click',()=>{if(importedNovelAIMetadata)copy(metadataCopyPayload(),'NovelAI解析結果')});
 byId('exportMetadataPNG').addEventListener('click',exportNovelAIMetadataPNG);
+byId('exportPublicPNG').addEventListener('click',exportPublicPNG);
 byId('saveImportedSnapshot').addEventListener('click',saveImportedSnapshot);
 byId('metadataFile').addEventListener('change',async event=>{
  try{
