@@ -34,7 +34,7 @@ assert(html.includes('resetUndoState=null;persistResetUndo()'));
 
 // Existing persistence paths remain the source of truth for snapshots, import/export and cloud sync.
 assert(html.includes('function captureSettings()'));
-assert(html.includes('function applySettings(state)'));
+assert(html.includes('function applySettings(state,options={})'));
 assert(html.includes('const SNAPSHOTS_KEY='));
 assert(html.includes('state:captureSettings()') || html.includes('captureSettings(),customLooks'));
 assert(html.includes("localStorage.setItem('nai_prompt_studio_v13'"));
