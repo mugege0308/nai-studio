@@ -23,7 +23,7 @@ assert(html.includes('function saveState()'));
 
 // Existing entry rendering remains underneath the expandable content.
 assert(html.includes('renderFavoriteEntry(entry,type,folder.id)'));
-assert(html.includes("addTag(entry.tag,'favorite')"));
+assert(html.includes("addTag(entry.tag,'favorite',{en:entry.tag,cat:type==='works'?4:''"));
 assert(html.includes('applySavedCharacter(entry.tag,target)'));
 assert(html.includes('copyFavoriteTag(entry.tag)'));
 

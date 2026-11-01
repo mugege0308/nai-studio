@@ -8,15 +8,18 @@ const context = {
   fetch: async url => ({
     ok: true,
     json: async () => url.endsWith("tags-general.json")
-      ? [{tag: "silver hair", jp: "銀髪", aliases: ["silver_hair"], count: 42, category: 0}, {tag: "silver hairband", jp: "銀髪飾り", aliases: [], count: 99999, category: 0}, {tag: "blue hair", jp: "", aliases: [], count: 12, category: 0}, {tag: "black hair", jp: "黒髪", aliases: [], count: 10, category: 0}, {tag: "blonde hair", jp: "金髪", aliases: [], count: 9, category: 0}, {tag: "from behind", jp: "後ろ姿", aliases: [], count: 8, category: 0}]
+      ? [{tag: "silver hair", jp: "銀髪", aliases: ["silver_hair"], count: 42, category: 0}, {tag: "silver hairband", jp: "銀髪飾り", aliases: [], count: 99999, category: 0}, {tag: "blue hair", jp: "", aliases: [], count: 12, category: 0}, {tag: "black hair", jp: "黒髪", aliases: [], count: 10, category: 0}, {tag: "blonde hair", jp: "金髪", aliases: [], count: 9, category: 0}, {tag: "from behind", jp: "後ろ姿", aliases: [], count: 8, category: 0}, {tag: "izumi motoko", jp: "和泉元エイミ", aliases: [], count: 7, category: "character"}]
       : url.endsWith("translations-ja.json")
         ? {translations: {"blue hair": "青髪"}}
       : []
   })
 };
-context.importScripts = file => {
-  vm.runInNewContext(fs.readFileSync(file, "utf8"), context, {filename: file});
-  context.self.NaiTagSearchRanking = context.NaiTagSearchRanking;
+context.importScripts = (...files) => {
+  for (const file of files) {
+    vm.runInNewContext(fs.readFileSync(file, "utf8"), context, {filename: file});
+    context.self.NaiTagSearchRanking = context.NaiTagSearchRanking;
+    context.self.NaiTagSearchCategory = context.NaiTagSearchCategory;
+  }
 };
 vm.runInNewContext(fs.readFileSync("tag-search-worker.js", "utf8"), context);
 
@@ -42,5 +45,8 @@ vm.runInNewContext(fs.readFileSync("tag-search-worker.js", "utf8"), context);
   assert.equal(messages.at(-1).results[0].tag, "black hair");
   await context.self.onmessage({data: {type: "search", id: 5, query: "後ろ姿", category: "all"}});
   assert.equal(messages.at(-1).results[0].tag, "from behind");
+  await context.self.onmessage({data: {type: "search", id: 6, query: "izumi motoko", category: "all"}});
+  assert.equal(messages.at(-1).results[0].tag, "izumi motoko");
+  assert.equal(messages.at(-1).results[0].category, 4);
   console.log("worker Japanese/English/supplement search: OK");
 })().catch(error => { console.error(error); process.exitCode = 1; });

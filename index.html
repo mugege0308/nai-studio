@@ -468,6 +468,7 @@
 <footer class="footer">内蔵辞書は一般的なタグ候補を収録。Danbooruの全件ではありません。オンライン検索結果は英語タグで、登録済みの語には日本語の意味も表示します。利用件数はDanbooru上の件数です。<br>プロンプトの効き方はモデルや設定により変わります。v8では「共通 / 1人目 / 2人目」を別出力できます。パーツ別の絵柄設定は以前気に入った monobe yuri を初期値に設定しています。<br>NovelAIやDanbooruの公式ツールではない個人用テンプレートです。<br>日本語Danbooru検索は内蔵タグ辞書と同義語による変換で実現。未登録語のみ任意で <a href="https://mymemory.translated.net/doc/spec.php" target="_blank" rel="noopener noreferrer">MyMemory</a> の公開翻訳APIを使用します。オフライン翻訳には限界があります。</footer>
 </div>
 <script src="./tag-search-ranking.js"></script>
+<script src="./tag-search-category.js"></script>
 <script src="./novelai-metadata.js"></script>
 <script src="./image-store.js"></script>
 <script>
@@ -604,7 +605,10 @@ function replaceCharacterFromTag(tag,target){
  const field=characterTargetField(target);if(!field){setFavoriteStatus('キャラ2は現在未使用です。先に「2人目の種類・映り方」を選択してください。');return false}
  byId(field).value=String(tag||'').replace(/_/g,' ').trim();refresh();renderTagList();setFavoriteStatus(characterTargetLabel(target)+'を「'+byId(field).value+'」に差し替えました');return true;
 }
-function isCharacterTag(item){const cat=item?.cat??item?.category;return Number(cat)===4||String(cat||'').toLowerCase()==='character'}
+function normalizeTagCategory(value){return window.NaiTagSearchCategory.normalize(value)}
+function canonicalTagCategory(value){return window.NaiTagSearchCategory.canonical(value)}
+function tagCategoryLabel(value){return window.NaiTagSearchCategory.label(value)}
+function isCharacterTag(item){const cat=item?.cat??item?.category;return window.NaiTagSearchCategory.isCharacter(cat)}
 function tagIsActive(en,dest){
  const target=characterReplaceTarget(dest);if(target){const field=characterTargetField(target);return Boolean(field&&normalize(byId(field).value)===normalize(en))}
  if(dest==='negative')return byId('negative').value.split(/[,，\n]+/).some(item=>normalize(item)===normalize(en));
@@ -1000,7 +1004,7 @@ function saveManualFavorite(){
 function renderFavoriteEntry(entry,type,folderId){
  const row=document.createElement('div');row.className='favorite-entry';const text=document.createElement('div');text.className='favorite-label';text.textContent=entry.label;const en=document.createElement('span');en.className='favorite-en';en.textContent=entry.tag;text.appendChild(en);row.appendChild(text);
  if(type==='works'){for(const [label,target] of [['キャラ1','character'],['キャラ2','maleCharacter']]){const b=document.createElement('button');b.type='button';b.className='btn';b.textContent=label;b.title=label==='キャラ2'?'現在の男性・女の子モードの入力欄へ適用':'キャラ1の入力欄へ置換';b.onclick=()=>applySavedCharacter(entry.tag,target);row.appendChild(b)}}
- const add=document.createElement('button');add.type='button';add.className='btn';add.textContent='追加';add.title='現在選択中の追加先へプロンプトタグを追加';add.onclick=()=>addTag(entry.tag,'favorite');row.appendChild(add);
+ const add=document.createElement('button');add.type='button';add.className='btn';add.textContent='追加';add.title='現在選択中の追加先へプロンプトタグを追加';add.onclick=()=>addTag(entry.tag,'favorite',{en:entry.tag,cat:type==='works'?4:'',source:'favorite'});row.appendChild(add);
  const cp=document.createElement('button');cp.type='button';cp.className='btn';cp.textContent='コピー';cp.onclick=()=>copyFavoriteTag(entry.tag);row.appendChild(cp);
  const edit=document.createElement('button');edit.type='button';edit.className='btn';edit.textContent='編集';edit.onclick=()=>{const label=prompt('日本語表示名',entry.label),tag=label===null?null:prompt('英語タグ',entry.tag);if(label===null||tag===null||!tag.trim())return;entry.label=label.trim()||tag.trim();entry.tag=tag.trim().replace(/_/g,' ');persistFavoriteCollections();renderFavorites()};row.appendChild(edit);
  const [moveSelect,moveButton]=favoriteMoveControl(entry,type,folderId);row.append(moveSelect,moveButton);
@@ -1023,7 +1027,7 @@ function renderFavorites(){
  renderFavoriteFolderControls();const root=byId('favoriteCollectionsList');if(!root)return;root.replaceChildren();for(const [type,label] of [['works','作品'],['attributes','属性・構図']]){const section=document.createElement('section');section.className='favorite-section';const h=document.createElement('h3');h.textContent=label;section.appendChild(h);const folders=favoriteFolders(type);if(!folders.length){const empty=document.createElement('div');empty.className='favorite-empty';empty.textContent='フォルダがありません。上の欄から追加してください。';section.appendChild(empty)}else for(const folder of folders)section.appendChild(renderFavoriteGroup(type,folder));root.appendChild(section)}
  const section=document.createElement('section');section.className='favorite-section';const h=document.createElement('h3');h.textContent='未分類';section.appendChild(h);const query=normalize(byId('favoriteFilter')?.value||'');const sort=byId('favoriteSort')?.value||'label';const list=favoriteCollections.uncategorized.filter(entry=>!query||normalize(entry.label).includes(query)||normalize(entry.tag).includes(query)).slice().sort((a,b)=>normalize(sort==='tag'?a.tag:a.label).localeCompare(normalize(sort==='tag'?b.tag:b.label),'ja'));if(!list.length){const empty=document.createElement('div');empty.className='favorite-empty';empty.textContent=favoriteCollections.uncategorized.length?'検索条件に一致するお気に入りはありません。':'未分類のタグはありません。';section.appendChild(empty)}else for(const entry of list){const row=renderFavoriteEntry(entry,'attributes','uncategorized');section.appendChild(row)}root.appendChild(section);
 }
-function tagLabel(cat){return {0:'一般',1:'絵師',3:'作品',4:'キャラ',5:'メタ'}[cat]||'タグ'}
+function tagLabel(cat){return tagCategoryLabel(cat)}
 function setTagDictMeta(text, error=false){const el=byId('tagDictMeta');if(!el)return;el.textContent=text;el.style.color=error?'#ffb4b4':''}
 function formatTagDictDate(value){if(!value)return '未生成';const date=new Date(value);return Number.isNaN(date.getTime())?String(value):date.toLocaleString('ja-JP')}
 async function ensureTagDictionary(){
@@ -1053,7 +1057,7 @@ async function ensureTagDictionary(){
   worker.addEventListener('message',event=>{
    const message=event.data||{};
    if(message.type==='result'&&message.id===tagDictRequest){
-    externalTagResults=(message.results||[]).map(item=>({en:item.tag,jp:item.jp||'',cat:Number(item.category),count:Number(item.count)||0,score:Number(item.score)||0,rank:Number.isFinite(item.rank)?item.rank:undefined,kind:item.kind||'partial',verified:item.verified!==false,source:item.source||'upstream'}));
+    externalTagResults=(message.results||[]).map(item=>{const rawCategory=item.category??item.cat;return {en:item.tag,jp:item.jp||'',cat:canonicalTagCategory(rawCategory),category:normalizeTagCategory(rawCategory),count:Number(item.count)||0,score:Number(item.score)||0,rank:Number.isFinite(item.rank)?item.rank:undefined,kind:item.kind||'partial',verified:item.verified!==false,source:item.source||'upstream'}});
     byId('tagSearchStatus').textContent=externalTagResults.length+'件（上流辞書、完全一致・同義語・部分一致・関連語順）';
     renderTagList();
    }else if(message.type==='error'&&message.id===tagDictRequest){
@@ -1116,7 +1120,7 @@ function modeUI(){
  function addTag(en,source='search',item=null){
  en=en.replace(/_/g,' ').trim();if(!en)return;
   if(pngEditorSearchMode&&metadataTagDraft){if(pngEditorCharacterReplaceTarget){if(!isCharacterTag(item)){byId('tagSearchStatus').textContent='キャラクターカテゴリのタグだけ置換に使えます。';return}applyPngEditorCharacterReplacement(en,pngEditorCharacterReplaceTarget,'');pngEditorCharacterReplaceTarget='';showPngEditorView();setPngSetStatus('タグ検索からキャラ置換を適用しました');return}const destination=byId('pngEditorAddDestination')?.value||'common';if(!metadataPngAppendEntry(en,'search',0,metadataTagCategory(en,'manual'),destination)){byId('tagSearchStatus').textContent='このタグは同じ出力先へ追加済みです。';return}renderPngPromptEditor();byId('tagSearchStatus').textContent='PNG編集セットへ「'+en+'」を追加しました。';return}
- const replacementTarget=characterReplaceTarget();if(replacementTarget){setFavoriteStatus('差し替えにはキャラクターカテゴリの検索結果を使ってください。');return}
+ const replacementTarget=characterReplaceTarget();if(replacementTarget){if(!isCharacterTag(item)){setFavoriteStatus('差し替えにはキャラクターカテゴリの検索結果を使ってください。');return}replaceCharacterFromTag(en,replacementTarget);return}
  if(byId('tagDestination').value==='negative'){
   const dest='negative',neg=byId('negative'),parts=neg.value.split(/[,，\n]+/).map(x=>x.trim()).filter(Boolean),idx=parts.findIndex(x=>normalize(x)===normalize(en));
    if(idx>=0){parts.splice(idx,1);unmarkSearchTag(dest,en);unmarkFavoriteTag(dest,en);byId('tagSearchStatus').textContent='UCから「'+en+'」を外しました。'}
@@ -1143,7 +1147,7 @@ function tagCard(item){
  const main=document.createElement('button');main.className='tagbtn'+(active?' added':'');main.type='button';main.title=active?'選択した追加先から削除':'選択した追加先に入れる';
   const left=document.createElement('span'),a=document.createElement('span'),sub=document.createElement('span');a.className='primary';a.textContent=jp||en;
  const status=item.verified===false?(item.kind==='related'?'関連候補・実在未確認':'自由プロンプト候補・実在未確認'):(item.kind==='related'?'関連タグ':'');
- sub.className='secondary';sub.textContent=[jp?'英語：'+en:'英語タグ',status,Number.isFinite(count)&&count>0?'使用 '+count.toLocaleString()+'件':'',typeof cat==='number'?tagLabel(cat):''].filter(Boolean).join(' · ');
+ sub.className='secondary';sub.textContent=[jp?'英語：'+en:'英語タグ',status,Number.isFinite(count)&&count>0?'使用 '+count.toLocaleString()+'件',cat!==undefined&&cat!==null&&cat!==''?tagLabel(cat):''].filter(Boolean).join(' · ');
   left.append(a,sub);const plus=document.createElement('span');plus.className='plus';plus.textContent=replacementTarget?(characterTag?(targetReady?(active?'済':'差替'):'案内'):'対象外'):active?'✓':'＋';main.append(left,plus);
   if(replacementTarget){main.title=characterTag?(replacementTarget==='png_character_replace'?'PNG編集内のキャラ置換候補':'選択したキャラクタータグで'+(replacementTarget==='character'?'キャラ1':'キャラ2')+'を完全に置換'):'キャラクターカテゴリのタグだけ差し替えできます';main.disabled=!characterTag;main.addEventListener('click',()=>{if(characterTag)addTag(en,'search',item)})}else{main.title=active?'選択した追加先から削除':'選択した追加先に入れる';main.addEventListener('click',()=>addTag(en,'search',item))}
  const copyButton=document.createElement('button');copyButton.type='button';copyButton.className='tag-copy';copyButton.textContent='コピー';copyButton.title='英語タグだけをコピー';copyButton.addEventListener('click',event=>{event.stopPropagation();copyTag(en)});
@@ -1159,7 +1163,7 @@ function getLocalResults(){
   let score=0;
   if(q){if(name===q)score=1000;else if(translated===q)score=980;else if(name.startsWith(q)||translated.startsWith(q))score=760;else if(name.includes(q)||translated.includes(q))score=560;}
   const kind=score>=980?'exact':score>=760?'prefix':'partial';
-  return {en,jp:translatedText,cat:c,score,rank:tagRanking.RANKS[kind],kind,verified:false,source:'internal'};
+  return {en,jp:translatedText,cat:canonicalTagCategory(c),category:normalizeTagCategory(c),score,rank:tagRanking.RANKS[kind],kind,verified:false,source:'internal'};
  }).filter(Boolean);
  if(q&&typeof jpTagSynonyms!=='undefined'){
   for(const [jp,terms] of jpTagSynonyms){
@@ -1167,7 +1171,8 @@ function getLocalResults(){
    for(const [index,en] of terms.entries()){
     const found=typeof localByEnglish!=='undefined'?localByEnglish.get(normalize(en)):null;
     const kind=index===0?'free':'related';
-    scored.push({en,jp:found?.[2]||jp,cat:found?.[0]||'details',score:820-index*3,rank:tagRanking.RANKS[kind],kind,verified:Boolean(found),source:'synonym'});
+    const rawCategory=found?.[0]||'details';
+    scored.push({en,jp:found?.[2]||jp,cat:canonicalTagCategory(rawCategory),category:normalizeTagCategory(rawCategory),score:820-index*3,rank:tagRanking.RANKS[kind],kind,verified:Boolean(found),source:'synonym'});
    }
   }
  }
@@ -1179,7 +1184,7 @@ function renderTagList(){
  const el=byId('tagResults');el.innerHTML='';const q=normalize(byId('tagQuery').value);
  let items=[];
  if(searchMode==='local')items=getLocalResults();
- else if(searchMode==='saved')items=favoriteTags.map(en=>{const found=allTags.find(x=>normalize(x[1])===normalize(en));return {en,jp:japaneseForItem({en,jp:found?.[2]||''}),cat:found?.[0]||''}}).filter(t=>!q||normalize(t.en+' '+t.jp).includes(q));
+ else if(searchMode==='saved')items=favoriteEntries().map(entry=>{const found=allTags.find(x=>normalize(x[1])===normalize(entry.tag));const rawCategory=entry.kind==='character'?4:(found?.[0]||'');return {en:entry.tag,jp:japaneseForItem({en:entry.tag,jp:entry.label||found?.[2]||''}),cat:canonicalTagCategory(rawCategory),category:normalizeTagCategory(rawCategory)}}).filter(t=>!q||normalize(t.en+' '+t.jp).includes(q));
  else items=remoteTags.filter(x=>!byId('onlineCategory').value||String(x.cat)===byId('onlineCategory').value);
  const visible=items.slice(0,displayLimit);for(const item of visible)el.appendChild(tagCard(item));
  byId('resultCount').textContent=remoteLoading?'検索中…':(items.length+'件'+(items.length>displayLimit?' / '+displayLimit+'件表示':''));
@@ -1212,7 +1217,7 @@ function lookupJP(q){
  return tagRanking.dedupe([...scores.values()],{preferGeneral:true});
 }
 function localPreview(results){
- return results.slice(0,50).map(x=>({en:x.en,jp:japaneseForItem({en:x.en,jp:localByEnglish.get(normalize(x.en))?.[2]||x.jp||''}),cat:({face:0,hair:0,clothes:0,pose:0,camera:0,scene:0,light:0,details:0})[localByEnglish.get(normalize(x.en))?.[0]]??0,score:x.score,rank:x.rank,kind:x.kind,verified:x.verified,source:x.source||'内蔵辞書候補'}));
+ return results.slice(0,50).map(x=>{const found=localByEnglish.get(normalize(x.en)),rawCategory=found?.[0]??x.category??'';return {en:x.en,jp:japaneseForItem({en:x.en,jp:found?.[2]||x.jp||''}),cat:canonicalTagCategory(rawCategory),category:normalizeTagCategory(rawCategory),score:x.score,rank:x.rank,kind:x.kind,verified:x.verified,source:x.source||'内蔵辞書候補'}});
 }
 function showConverted(original,candidates,kind){
  const el=byId('searchInterpretation');el.style.display='';
@@ -1275,7 +1280,8 @@ async function runOnlineSearch(){
      if(candidate.kind==='related'){kind='related';rank=tagRanking.RANKS.related}
      else {kind='exact';rank=tagRanking.RANKS.exact}
     }else{kind=tagRanking.classify(en,jp?q:q);rank=tagRanking.RANKS[kind]}
-    combined.set(key,{en,jp:japaneseForItem({en,jp:local?.[2]||prev?.jp||candidate?.jp||''}),cat:Number(entry.category),count:Number(entry.post_count)||0,score:candidate?.score||0,rank,kind,verified,source:'Danbooru'});
+    const rawCategory=entry.category;
+    combined.set(key,{en,jp:japaneseForItem({en,jp:local?.[2]||prev?.jp||candidate?.jp||''}),cat:canonicalTagCategory(rawCategory),category:normalizeTagCategory(rawCategory),count:Number(entry.post_count)||0,score:candidate?.score||0,rank,kind,verified,source:'Danbooru'});
    }
   }
   if(!success)throw new Error('Danbooruに接続できませんでした。辞書候補はそのまま利用できます。');

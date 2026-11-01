@@ -1,6 +1,7 @@
 /* The large upstream dictionary is searched here, never in the page thread. */
-importScripts("tag-search-ranking.js");
+importScripts("tag-search-ranking.js", "tag-search-category.js");
 const tagRanking = self.NaiTagSearchRanking;
+const tagCategory = self.NaiTagSearchCategory || (typeof globalThis !== "undefined" ? globalThis.NaiTagSearchCategory : null);
 let basePath = "./data/tagdb/";
 let manifest = null;
 let synonymEntries = [];
@@ -73,7 +74,7 @@ function synonymResults(query) {
       jp: entry.jp || "",
       aliases: [],
       count: 0,
-      category: 0,
+      category: tagCategory.canonical(0),
       score: terms.includes(q) ? 820 : 680,
       rank: tagRanking.RANKS.synonym,
       kind: "synonym",
@@ -87,7 +88,7 @@ function synonymResults(query) {
         jp: "",
         aliases: [],
         count: 0,
-        category: 0,
+        category: tagCategory.canonical(0),
         score: 310,
         rank: tagRanking.RANKS.related,
         kind: "related",
@@ -119,16 +120,17 @@ async function search(message) {
   for (const shard of shards) {
     const rows = await loadShard(shard);
     for (const record of rows) {
-      const score = scoreRecord(record, query);
+      const normalizedRecord = {...record, category: tagCategory.canonical(record.category)};
+      const score = scoreRecord(normalizedRecord, query);
       if (score > 0) {
         const kind = score >= 900 ? "exact" : score >= 760 ? "prefix" : "partial";
-        ranked.push({...record, score, rank: tagRanking.RANKS[kind], kind, verified: true, source: "upstream"});
+        ranked.push({...normalizedRecord, score, rank: tagRanking.RANKS[kind], kind, verified: true, source: "upstream"});
       }
     }
   }
   const preferGeneral = /[\u3040-\u30ff\u3400-\u9fff]/.test(query) && category === "all";
   return tagRanking.dedupe(ranked, {preferGeneral})
-    .map(record => ({...record, jp: japaneseFor(record)}))
+    .map(record => ({...record, category: tagCategory.canonical(record.category), jp: japaneseFor(record)}))
     .slice(0, 120);
 }
 

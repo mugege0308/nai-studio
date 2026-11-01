@@ -21,7 +21,7 @@ assert(html.includes('function closeManualFavorite()'));
 assert(html.includes('内蔵辞書やDanbooruにないタグも登録できます') || html.includes('辞書やDanbooruにないタグも登録できます'));
 assert(html.includes("if(list.some(entry=>normalize(entry.tag)===normalize(tag)))"));
 assert(html.includes('persistFavoriteCollections()'));
-assert(html.includes("addTag(entry.tag,'favorite')"));
+assert(html.includes("addTag(entry.tag,'favorite',{en:entry.tag,cat:type==='works'?4:''"));
 assert(html.includes("copyFavoriteTag(entry.tag)"));
 assert(html.includes("applySavedCharacter(entry.tag,target)"));
 assert(html.includes('function renderFavoriteEntry(entry,type,folderId)'));
