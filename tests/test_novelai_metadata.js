@@ -54,7 +54,7 @@ function sampleComment() {
 
 (async () => {
   const html = fs.readFileSync(require.resolve('../index.html'), 'utf8');
-  for (const id of ['metadataPanel', 'chooseMetadataFile', 'metadataInspectOnly', 'seed', 'copySeed', 'clearSeed', 'applyMetadata', 'restoreMetadata', 'copyMetadataJson', 'exportMetadataPNG', 'exportPublicPNG']) {
+  for (const id of ['metadataPanel', 'chooseMetadataFile', 'metadataInspectOnly', 'seed', 'copySeed', 'clearSeed', 'applyMetadata', 'restoreMetadata', 'copyMetadataJson', 'exportMetadataPNG', 'exportPublicPNG', 'metadataTagEditor']) {
     assert.ok(html.includes(`id="${id}"`), `metadata UI missing: ${id}`);
   }
   assert.ok(html.includes('<script src="./novelai-metadata.js"></script>'));
@@ -67,6 +67,11 @@ function sampleComment() {
   assert.ok(html.includes('公開用PNGを保存（生成情報なし）'));
   assert.ok(html.includes("const PANEL_KEYS=['presets','style','character','pov','extraTags','outputs','metadata'"));
   assert.ok(html.includes('「適用前の状態に戻す」で復元できます'));
+  assert.ok(html.includes('function buildMetadataTagDraft'));
+  assert.ok(html.includes('function applyMetadataTagDraft'));
+  assert.ok(html.includes('分類したタグをフォームへ反映'));
+  assert.ok(html.includes('元のPNGプロンプトに戻す'));
+  assert.ok(html.includes('metadataTagCategory'));
 
   const png = Buffer.concat([signature, textChunk('Software', 'NovelAI'), textChunk('Source', 'NovelAI Diffusion V5'), textChunk('Comment', sampleComment()), chunk('IEND', '')]);
   const parsed = await parsePNGTextChunks(png);

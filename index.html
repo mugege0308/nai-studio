@@ -81,6 +81,7 @@
 #imageDropZone.dragover{background:#32314b;border-color:#e9d6a6}
 #draftImagePreview{display:block;max-height:230px;max-width:100%;object-fit:contain;border-radius:10px;margin:9px auto}
 .metadata-panel{border-color:#65618a}.metadata-file{border:1px solid #454765;background:#151728;border-radius:11px;padding:10px;margin-top:10px}.metadata-file strong{display:block;overflow-wrap:anywhere}.metadata-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:10px}.metadata-field{border:1px solid #3e405b;border-radius:9px;padding:8px;background:#1d1e34;min-width:0}.metadata-field label{display:flex;gap:7px;align-items:flex-start;font-size:12px}.metadata-field input{flex:0 0 auto;margin-top:3px;accent-color:var(--accent2);width:17px;height:17px}.metadata-field .metadata-value{display:block;margin-top:4px;color:#d6d1e8;font-size:11px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:130px;overflow:auto}.metadata-subtitle{margin:13px 0 6px;font-size:12px;color:#eee8d8}.metadata-copy{margin-top:6px}.metadata-warning{color:#ffd0a3}.metadata-character{border-left:3px solid #8c87d6;padding-left:9px}.metadata-unsupported{opacity:.85}.metadata-apply-row{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px}.metadata-panel .btn{min-height:40px}.metadata-panel .status{margin-top:8px}@media(max-width:560px){.metadata-summary{grid-template-columns:1fr}}
+.metadata-tag-editor{margin-top:14px;border-top:1px solid #454765;padding-top:12px}.metadata-tag-toolbar{display:flex;gap:7px;flex-wrap:wrap;align-items:center}.metadata-tag-list{display:grid;gap:7px;margin-top:9px}.metadata-tag-row{display:grid;grid-template-columns:auto minmax(0,1fr) minmax(110px,.6fr) minmax(115px,.7fr) auto;gap:6px;align-items:center;padding:8px;border:1px solid #3e405b;border-radius:9px;background:#151728}.metadata-tag-row input[type="text"],.metadata-tag-row select,.metadata-tag-add input,.metadata-tag-add select{min-width:0;width:100%;border:1px solid #44465f;background:#101222;color:var(--ink);border-radius:7px;padding:8px;font-size:12px}.metadata-tag-row input[type="checkbox"]{width:17px;height:17px;accent-color:var(--accent2)}.metadata-tag-row .btn{min-height:34px;padding:6px 8px}.metadata-tag-row.metadata-duplicate{border-color:#b18b52}.metadata-tag-source{font-size:10px;color:var(--muted);grid-column:2/-1}.metadata-tag-add{display:grid;grid-template-columns:minmax(0,1fr) minmax(110px,.6fr) minmax(115px,.7fr) auto;gap:6px;margin-top:10px}.metadata-tag-note{font-size:11px;color:var(--muted);margin-top:7px}.metadata-tag-original{white-space:pre-wrap;overflow-wrap:anywhere;max-height:170px;overflow:auto;border:1px solid #3e405b;border-radius:8px;background:#101222;padding:8px;font-size:11px;color:#d6d1e8}@media(max-width:700px){.metadata-tag-row{grid-template-columns:auto minmax(0,1fr) auto}.metadata-tag-row select{grid-column:2}.metadata-tag-row .metadata-tag-destination{grid-column:2}.metadata-tag-row .btn{grid-column:3;grid-row:1 / span 3}.metadata-tag-source{grid-column:2}.metadata-tag-add{grid-template-columns:1fr 1fr}.metadata-tag-add input{grid-column:1/-1}.metadata-tag-add .btn{grid-column:1/-1}}
 .snapshotimage{width:112px;height:112px;object-fit:cover;border-radius:9px;background:#25253a;border:1px solid #55516d;cursor:zoom-in}
 .snapshotitem .snapshotlayout{display:flex;gap:11px;align-items:flex-start}
 .snapshotitem .snapshottext{flex:1;min-width:0}
@@ -308,6 +309,7 @@
  <div class="field"><label for="seed">Seed（保存・書き出し用）</label><div class="actions"><input id="seed" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="20" placeholder="未設定" autocomplete="off"><button class="btn" type="button" id="copySeed">⧉ Seedをコピー</button><button class="btn ghost" type="button" id="clearSeed">Seedをクリア</button></div><p class="hint">読み込んだSeedはここへ表示されます。未設定の項目はPNGへ追加しません。</p></div>
  <div id="metadataFileInfo" class="metadata-file hide"></div>
  <div id="metadataItems" class="hide"></div>
+ <div id="metadataTagEditor" class="metadata-tag-editor hide"></div>
  <div class="metadata-apply-row"><button class="btn primary" type="button" id="applyMetadata" disabled>選択項目をフォームへ反映</button><button class="btn" type="button" id="restoreMetadata" disabled>適用前の状態に戻す</button><button class="btn ghost" type="button" id="copyMetadataJson" disabled>解析結果をコピー</button><button class="btn primary" type="button" id="exportMetadataPNG">NovelAI互換PNGとして保存</button><button class="btn" type="button" id="exportPublicPNG">公開用PNGを保存（生成情報なし）</button><button class="btn" type="button" id="saveImportedSnapshot" disabled>画像＋設定セットとして保存</button></div>
  <p class="status" id="metadataStatus" role="status"></p>
 </section>
@@ -1364,8 +1366,84 @@ function metadataText(value){return value===null||value===undefined||value===''?
 function metadataField(key,label,value,{checked=true,disabled=false,extraClass=''}={}){
  const box=document.createElement('div');box.className='metadata-field '+extraClass;const row=document.createElement('label');const input=document.createElement('input');input.type='checkbox';input.dataset.metadataKey=key;input.checked=checked;input.disabled=disabled;const name=document.createElement('span');name.textContent=label;row.append(input,name);box.appendChild(row);const val=document.createElement('span');val.className='metadata-value';val.textContent=metadataText(value);box.appendChild(val);return box;
 }
-function metadataCopyPayload(){if(!importedNovelAIMetadata)return '';const m=importedNovelAIMetadata;return JSON.stringify({format:'NAI-Studio-NovelAI-Metadata',source:m.source,sourceLabel:m.sourceLabel,isNovelAI:m.isNovelAI,basePrompt:m.basePrompt,characters:m.characters,negativePrompt:m.negativePrompt,settings:m.settings,fields:m.fields},null,2)}
+function metadataCopyPayload(){if(!importedNovelAIMetadata)return '';const m=importedNovelAIMetadata;return JSON.stringify({format:'NAI-Studio-NovelAI-Metadata',source:m.source,sourceLabel:m.sourceLabel,isNovelAI:m.isNovelAI,basePrompt:m.basePrompt,characters:m.characters,negativePrompt:m.negativePrompt,settings:m.settings,fields:m.fields,tagDraft:metadataTagDraft?{original:metadataTagDraft.original,entries:metadataTagDraft.entries}:null},null,2)}
 function metadataSelection(){return [...document.querySelectorAll('#metadataItems [data-metadata-key]:checked')].map(input=>input.dataset.metadataKey)}
+const METADATA_TAG_CATEGORY_LABELS=Object.freeze({quality:'品質タグ',style:'絵柄・線画・塗り',character:'キャラ名・作品名',appearance:'外見・衣装',expression:'表情',pose:'ポーズ・動作',composition:'構図・カメラ・POV',background:'背景・照明',adult:'R-18関連',unclassified:'未分類'});
+const METADATA_TAG_DESTINATION_LABELS=Object.freeze({common:'共通',character1:'キャラ1',character2:'キャラ2',negative:'UC'});
+let metadataTagSequence=0,metadataTagDraft=null;
+function metadataPromptTags(value){
+ const source=String(value||'').replace(/\r/g,'');let out='',depth=0,quote='',escaped=false;
+ const push=()=>{const tag=out.trim();if(tag)result.push(tag);out=''};const result=[];
+ for(const ch of source){
+  if(escaped){out+=ch;escaped=false;continue}
+  if(ch==='\\'){out+=ch;escaped=true;continue}
+  if(quote){out+=ch;if(ch===quote)quote='';continue}
+  if(ch==='"'||ch==="'"){quote=ch;out+=ch;continue}
+  if('([{'.includes(ch))depth+=1;else if(')]}'.includes(ch))depth=Math.max(0,depth-1);
+  if(depth===0&&(ch===','||ch==='\n'))push();else out+=ch;
+ }
+ push();return result;
+}
+function metadataTagKey(value){return String(value||'').trim().replace(/\s+/g,' ').replace(/_/g,' ').toLowerCase()}
+function metadataTagCategory(tag,source,isPrimaryCharacter=false){
+ const value=metadataTagKey(tag);
+ if(source==='negative'&&/(nsfw|explicit|nude|nudity|sex|sexual|genital|porn|penis|vagina|cum|nipples|bare breasts|uncensored|close-up sex)/.test(value))return 'adult';
+ if(isPrimaryCharacter)return 'character';
+ if(/^(masterpiece|best quality|amazing quality|high quality|low quality|worst quality|normal quality|very aesthetic|absurdres|highres|score_|rating_|newest|recent)$/.test(value)||/^(score|rating)[ _:-]/.test(value))return 'quality';
+ if(/(anime style|illustration|lineart|line work|outline|cel shading|shading|coloring|render|sketch|watercolor|oil painting|comic style|manga style|visual novel|game cg|detailed irises|sparkling eyes|vivid colors|flat colors|monochrome|pixel art)/.test(value))return 'style';
+ if(/(smile|blush|crying|tears|angry|sad|happy|embarrassed|shy|expressionless|closed eyes|open mouth|surprised|frown|laughing|smirk|wink|looking at viewer)/.test(value))return 'expression';
+ if(/(standing|sitting|kneeling|walking|running|lying|reaching|holding|hand on|hugging|embracing|looking at|looking back|turning|leaning|arms? (behind|up|crossed)|raised hand|waving|eating|drinking|playing)/.test(value))return 'pose';
+ if(/(pov|first person|from (behind|side|above|below)|profile|three-quarter|over shoulder|back to viewer|facing (away|viewer)|camera|close-up|cowboy shot|full body|upper body|portrait|face focus|wide shot|two-shot|solo focus|centered)/.test(value))return 'composition';
+ if(/(sky|cloud|street|city|room|bedroom|classroom|school|forest|beach|ocean|indoors|outdoors|night|day|sunset|sunrise|lighting|light rays|rim light|backlighting|dramatic light|shadow|dark|bright background|simple background|window|curtain)/.test(value))return 'background';
+ if(/(dress|skirt|shirt|blouse|uniform|jacket|coat|hoodie|swimsuit|lingerie|underwear|pajamas|shoes|boots|socks|gloves|hat|ribbon|hair|eyes|eyebrows|earrings|necklace|jewelry|wings|tail|horns|long hair|short hair|colored hair)/.test(value))return 'appearance';
+ if(/(nsfw|explicit|nude|nudity|sex|sexual|genital|porn|penis|vagina|cum|nipples|bare breasts|uncensored)/.test(value))return 'adult';
+ return 'unclassified';
+}
+function metadataTagDestination(source,charIndex=0){return source==='negative'?'negative':source==='character'?(charIndex===0?'character1':'character2'):'common'}
+function metadataTagSourceLabel(entry){return entry.source==='base'?'共通PNG':entry.source==='negative'?'UC':`キャラクター${entry.charIndex+1}`}
+function metadataMakeTagEntry(tag,source,charIndex,category,destination){return {id:'metadata-tag-'+(++metadataTagSequence),tag:String(tag),source,charIndex:Number.isInteger(charIndex)?charIndex:0,category:category||'unclassified',destination:destination||metadataTagDestination(source),keep:true}}
+function buildMetadataTagDraft(meta){
+ const entries=[];
+ const add=(value,source,charIndex=0)=>{const tags=metadataPromptTags(value),characterTags=tags.filter(tag=>!/^(girl|boy|1girl|1boy|2girls|2boys|solo|solo focus)$/i.test(metadataTagKey(tag)));tags.forEach(tag=>{const primary=source==='character'&&tag===characterTags[0];entries.push(metadataMakeTagEntry(tag,source,charIndex,metadataTagCategory(tag,source,primary),metadataTagDestination(source,charIndex)))})};
+ add(meta.basePrompt,'base');(meta.characters||[]).forEach((item,index)=>add(item.caption,'character',index));add(meta.negativePrompt,'negative');
+ return {original:{basePrompt:String(meta.basePrompt||''),characters:(meta.characters||[]).map(item=>String(item.caption||'')),negativePrompt:String(meta.negativePrompt||'')},entries};
+}
+function metadataTagOptions(select,options,current){select.replaceChildren();for(const [value,label] of Object.entries(options)){const option=document.createElement('option');option.value=value;option.textContent=label;option.selected=value===current;select.appendChild(option)}}
+function metadataTagEntriesFromUI(){
+ if(!metadataTagDraft)return [];
+ return [...document.querySelectorAll('#metadataTagEditor .metadata-tag-row')].map(row=>{const entry=metadataTagDraft.entries.find(item=>item.id===row.dataset.metadataTagId);if(!entry)return null;entry.tag=row.querySelector('[data-metadata-tag-value]')?.value.trim()||'';entry.keep=Boolean(row.querySelector('[data-metadata-tag-keep]')?.checked);entry.category=row.querySelector('[data-metadata-tag-category]')?.value||'unclassified';entry.destination=row.querySelector('[data-metadata-tag-destination]')?.value||'common';return entry}).filter(Boolean);
+}
+function updateMetadataTagDuplicates(){
+ const entries=metadataTagEntriesFromUI(),counts=new Map();for(const entry of entries)if(entry.keep&&entry.tag)counts.set(metadataTagKey(entry.tag),Number(counts.get(metadataTagKey(entry.tag))||0)+1);
+ for(const row of document.querySelectorAll('#metadataTagEditor .metadata-tag-row')){const entry=entries.find(item=>item.id===row.dataset.metadataTagId);row.classList.toggle('metadata-duplicate',Boolean(entry&&entry.keep&&entry.tag&&counts.get(metadataTagKey(entry.tag))>1))}
+ const note=byId('metadataTagDuplicateNote');if(note)note.textContent=[...counts.values()].some(count=>count>1)?'同じタグが複数あります。意図的な強調は残せますが、不要なら行を削除してください。':'重複候補はありません。';
+}
+function renderMetadataTagEditor(draft){
+ const root=byId('metadataTagEditor');if(!root)return;root.replaceChildren();if(!draft){root.classList.add('hide');return}root.classList.remove('hide');
+ const title=document.createElement('h3');title.className='metadata-subtitle';title.textContent='PNGプロンプトをタグ単位で分解';root.appendChild(title);
+ const note=document.createElement('p');note.className='metadata-tag-note';note.textContent='削除・カテゴリ変更・共通／キャラ1／キャラ2／UCの移動をしてから、必要なタグだけフォームへ反映できます。未知のタグは未分類のまま残ります。';root.appendChild(note);
+ const toolbar=document.createElement('div');toolbar.className='metadata-tag-toolbar';const apply=document.createElement('button');apply.type='button';apply.id='applyMetadataTags';apply.className='btn primary';apply.textContent='分類したタグをフォームへ反映';apply.disabled=!importedNovelAIMetadata?.isNovelAI||byId('metadataInspectOnly').checked;apply.onclick=applyMetadataTagDraft;const reset=document.createElement('button');reset.type='button';reset.id='restoreMetadataTagDraft';reset.className='btn';reset.textContent='元のPNGプロンプトに戻す';reset.onclick=()=>{metadataTagDraft=buildMetadataTagDraft(importedNovelAIMetadata);renderMetadataTagEditor(metadataTagDraft);metadataStatus('分類前のPNGプロンプトへ戻しました')};toolbar.append(apply,reset);root.appendChild(toolbar);
+ const original=document.createElement('details');original.className='metadata-tag-note';const summary=document.createElement('summary');summary.textContent='元のPNGプロンプトを確認';original.appendChild(summary);const raw=document.createElement('div');raw.className='metadata-tag-original';raw.textContent=[draft.original.basePrompt,...draft.original.characters,draft.original.negativePrompt].filter(Boolean).join('\n---\n');original.appendChild(raw);root.appendChild(original);
+ const list=document.createElement('div');list.className='metadata-tag-list';draft.entries.forEach(entry=>{const row=document.createElement('div');row.className='metadata-tag-row';row.dataset.metadataTagId=entry.id;const keep=document.createElement('input');keep.type='checkbox';keep.dataset.metadataTagKeep='';keep.checked=entry.keep;keep.title='反映するタグ';const input=document.createElement('input');input.type='text';input.dataset.metadataTagValue='';input.value=entry.tag;input.title='タグを編集';const category=document.createElement('select');category.dataset.metadataTagCategory='';metadataTagOptions(category,METADATA_TAG_CATEGORY_LABELS,entry.category);const destination=document.createElement('select');destination.dataset.metadataTagDestination='';metadataTagOptions(destination,METADATA_TAG_DESTINATION_LABELS,entry.destination);destination.className='metadata-tag-destination';const remove=document.createElement('button');remove.type='button';remove.className='btn ghost';remove.textContent='削除';remove.onclick=()=>{keep.checked=false;input.value='';metadataTagEntriesFromUI();updateMetadataTagDuplicates()};const source=document.createElement('span');source.className='metadata-tag-source';const jp=typeof japaneseForItem==='function'?japaneseForItem({en:entry.tag}):'';source.textContent=metadataTagSourceLabel(entry)+(jp?' · '+jp:'');for(const control of [keep,input,category,destination])control.addEventListener('input',updateMetadataTagDuplicates);for(const control of [keep,input,category,destination])control.addEventListener('change',updateMetadataTagDuplicates);row.append(keep,input,category,destination,remove,source);list.appendChild(row)});root.appendChild(list);
+ const addBox=document.createElement('div');addBox.className='metadata-tag-add';const newInput=document.createElement('input');newInput.id='metadataNewTag';newInput.placeholder='タグを追加（例: silver hair）';const newCategory=document.createElement('select');newCategory.id='metadataNewTagCategory';metadataTagOptions(newCategory,METADATA_TAG_CATEGORY_LABELS,'unclassified');const newDestination=document.createElement('select');newDestination.id='metadataNewTagDestination';metadataTagOptions(newDestination,METADATA_TAG_DESTINATION_LABELS,'common');const addButton=document.createElement('button');addButton.type='button';addButton.className='btn';addButton.textContent='＋ タグを追加';addButton.onclick=()=>{const tag=newInput.value.trim();if(!tag){metadataStatus('追加するタグを入力してください。',true);return}metadataTagDraft.entries.push(metadataMakeTagEntry(tag,'manual',0,newCategory.value,newDestination.value));renderMetadataTagEditor(metadataTagDraft);metadataStatus('分類プレビューへタグを追加しました')};addBox.append(newInput,newCategory,newDestination,addButton);root.appendChild(addBox);const duplicate=document.createElement('p');duplicate.id='metadataTagDuplicateNote';duplicate.className='metadata-tag-note';root.appendChild(duplicate);updateMetadataTagDuplicates();
+}
+function metadataAppendPromptText(id,tag){const el=byId(id);if(!el)return;const current=metadataPromptTags(el.value),key=metadataTagKey(tag);if(current.some(item=>metadataTagKey(item)===key))return;current.push(tag);el.value=current.join(', ')}
+function metadataAppendTagArray(array,tag){if(!array.some(item=>metadataTagKey(item)===metadataTagKey(tag)))array.push(tag)}
+function metadataCharacter2Field(){return byId('maleMode').value==='girl2'?'girl2Character':'maleCharacter'}
+function metadataCharacter2Array(){return byId('maleMode').value==='girl2'?girl2Tags:maleTags}
+function applyMetadataTagEntry(entry,warnings){
+ const tag=entry.tag.trim();if(!tag||!entry.keep)return;
+ if(entry.destination==='negative'){metadataAppendPromptText('negative',tag);return}
+ if(entry.destination==='character1'){if(entry.category==='character')metadataAppendPromptText('character',tag);else metadataAppendTagArray(femaleTags,tag);return}
+ if(entry.destination==='character2'){if(entry.category==='character')metadataAppendPromptText(metadataCharacter2Field(),tag);else metadataAppendTagArray(metadataCharacter2Array(),tag);if(byId('maleMode').value==='none')warnings.push('キャラ2のタグを保持しました。2人目を有効にすると出力されます。');return}
+ metadataAppendTagArray(extraTags,tag);
+}
+function applyMetadataTagDraft(){
+ if(!metadataTagDraft||!importedNovelAIMetadata)return;if(byId('metadataInspectOnly').checked){metadataStatus('確認モード中です。反映する場合は確認モードをOFFにしてください。',true);return}
+ const entries=metadataTagEntriesFromUI().filter(entry=>entry.keep&&entry.tag);if(!entries.length){metadataStatus('反映するタグが選択されていません。',true);return}
+ if(!confirm('分類したタグを既存のStudio欄へ追加・振り分けます。反映前の状態は復元できます。続けますか？'))return;
+ metadataImportUndoState=captureSettings();persistMetadataUndo();const warnings=[];entries.forEach(entry=>applyMetadataTagEntry(entry,warnings));refresh();metadataStatus('分類したPNGタグをフォームへ反映しました。'+(warnings.length?' '+[...new Set(warnings)].join(' '):''),Boolean(warnings.length));
+}
 function seedValue(){const value=byId('seed').value.trim();return /^\d+$/.test(value)?value:''}
 function buildNovelAIMetadata(){
  const prompts=buildPrompts(),raw={metadata_type:'nai-studio-export',exported_by:'NAI Studio',prompt:prompts.base,uc:byId('negative').value.trim(),v4_prompt:{caption:{base_caption:prompts.base,char_captions:[]}},v4_negative_prompt:{caption:{base_caption:byId('negative').value.trim()}},request_type:'NAI-StudioExport'};
@@ -1377,10 +1455,10 @@ function buildNovelAIMetadata(){
  for(const [setting,key] of Object.entries(keys))if(source[setting]!==null&&source[setting]!==undefined&&source[setting]!==''&&Object.prototype.hasOwnProperty.call(sourceRaw,key))raw[key]=sourceRaw[key];
  return raw;
 }
-function updateMetadataApplyState(){const button=byId('applyMetadata');if(!button)return;button.disabled=!importedNovelAIMetadata||!importedNovelAIMetadata.isNovelAI||byId('metadataInspectOnly').checked||!metadataSelection().some(key=>key==='base'||key==='negative'||key==='seed'||key.startsWith('character:'))}
+function updateMetadataApplyState(){const disabled=!importedNovelAIMetadata||!importedNovelAIMetadata.isNovelAI||byId('metadataInspectOnly').checked;const button=byId('applyMetadata');if(button)button.disabled=disabled||!metadataSelection().some(key=>key==='base'||key==='negative'||key==='seed'||key.startsWith('character:'));const tagButton=byId('applyMetadataTags');if(tagButton)tagButton.disabled=disabled}
 function renderNovelAIMetadata(meta){
- importedNovelAIMetadata=null;
- const info=byId('metadataFileInfo'),root=byId('metadataItems');info.replaceChildren();root.replaceChildren();info.classList.remove('hide');root.classList.remove('hide');
+ importedNovelAIMetadata=null;metadataTagDraft=null;
+ const info=byId('metadataFileInfo'),root=byId('metadataItems'),tagEditor=byId('metadataTagEditor');info.replaceChildren();root.replaceChildren();tagEditor?.replaceChildren();tagEditor?.classList.add('hide');info.classList.remove('hide');root.classList.remove('hide');
  const title=document.createElement('strong');const studioExport=meta.raw?.metadata_type==='nai-studio-export';title.textContent=(meta.fileName||'選択したPNG')+'：'+(meta.hasMetadata?(studioExport?'NAI Studio書き出し（NovelAI互換）':meta.isNovelAI?'NovelAI形式を検出':'PNGテキスト情報を検出'):'生成メタデータなし');info.appendChild(title);
  const detail=document.createElement('div');detail.className='small muted';detail.textContent=(meta.source==='stealth_pngcomp'?'stealth_pngcomp（アルファLSB）':meta.source==='png-text'?'PNGテキストチャンク':'情報なし')+' · '+(meta.sourceLabel||'出典情報なし');info.appendChild(detail);
  if(!meta.hasMetadata){const p=document.createElement('p');p.className='small metadata-warning';p.textContent='NovelAIの生成情報は見つかりませんでした。元のPNGを使用してください。';info.appendChild(p);byId('applyMetadata').disabled=true;byId('copyMetadataJson').disabled=true;return}
@@ -1394,7 +1472,7 @@ function renderNovelAIMetadata(meta){
  root.appendChild(metadataField('negative','UC（negative prompt） → UC欄を置換',meta.negativePrompt,{checked:Boolean(meta.negativePrompt)}));
  root.appendChild(metadataField('seed','Seed → Seed欄を置換',meta.settings.seed===null?'':String(meta.settings.seed),{checked:meta.settings.seed!==null}));
  const unsupported=document.createElement('p');unsupported.className='hint metadata-unsupported';unsupported.textContent='モデル、解像度、Steps、Guidance、Samplerなどは現在のStudioに編集欄がないため自動適用しません。読み込んだPNGから書き出す場合は確認できた値だけを引き継ぎます。';root.appendChild(unsupported);
- importedNovelAIMetadata=meta;byId('copyMetadataJson').disabled=false;updateMetadataApplyState();
+ importedNovelAIMetadata=meta;metadataTagDraft=buildMetadataTagDraft(meta);renderMetadataTagEditor(metadataTagDraft);byId('copyMetadataJson').disabled=false;updateMetadataApplyState();
 }
 function persistMetadataUndo(){try{if(metadataImportUndoState)sessionStorage.setItem(METADATA_UNDO_KEY,JSON.stringify(metadataImportUndoState));else sessionStorage.removeItem(METADATA_UNDO_KEY)}catch(_){}byId('restoreMetadata').disabled=!metadataImportUndoState}
 function readMetadataUndo(){try{const value=JSON.parse(sessionStorage.getItem(METADATA_UNDO_KEY)||'null');metadataImportUndoState=value&&typeof value==='object'&&!Array.isArray(value)?value:null}catch(_){metadataImportUndoState=null}byId('restoreMetadata').disabled=!metadataImportUndoState}
@@ -1744,7 +1822,7 @@ byId('metadataFile').addEventListener('change',async event=>{
   const file=event.target.files?.[0];if(!file)return;if(file.size>50*1024*1024)throw Error('50MB以下のPNGを選んでください');
   if(file.type!=='image/png'&&!/\.png$/i.test(file.name))throw Error('PNG画像を選んでください');
   metadataStatus('PNGを解析しています…');const meta=await NovelAIMetadata.read(file);importedNovelAIFile=file;importedNovelAIImageBytes=new Uint8Array(await file.arrayBuffer());meta.fileName=file.name;renderNovelAIMetadata(meta);byId('saveImportedSnapshot').disabled=false;metadataStatus(meta.hasMetadata?(meta.isNovelAI?'NovelAIの生成情報を確認できます。反映前に項目を選択してください。':'PNG情報を確認できます。NovelAI形式ではないためフォームへの反映は行いません。'):'生成メタデータがなくても、画像と現在の設定を保存できます。',!meta.hasMetadata||!meta.isNovelAI);
- }catch(error){importedNovelAIMetadata=null;importedNovelAIImageBytes=null;importedNovelAIFile=null;byId('metadataFileInfo').classList.add('hide');byId('metadataItems').classList.add('hide');byId('applyMetadata').disabled=true;byId('copyMetadataJson').disabled=true;byId('saveImportedSnapshot').disabled=true;metadataStatus('PNG解析に失敗しました：'+error.message,true)}finally{byId('metadataFile').value=''}
+ }catch(error){importedNovelAIMetadata=null;metadataTagDraft=null;importedNovelAIImageBytes=null;importedNovelAIFile=null;byId('metadataFileInfo').classList.add('hide');byId('metadataItems').classList.add('hide');byId('metadataTagEditor').classList.add('hide');byId('applyMetadata').disabled=true;byId('copyMetadataJson').disabled=true;byId('saveImportedSnapshot').disabled=true;metadataStatus('PNG解析に失敗しました：'+error.message,true)}finally{byId('metadataFile').value=''}
 });
 readMetadataUndo();
 const zone=byId('imageDropZone');
