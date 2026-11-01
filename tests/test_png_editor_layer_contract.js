@@ -18,5 +18,28 @@ assert(html.includes('normalizePngEditorOverride(value)'), 'old saved sets need 
 assert(html.includes('pngEditorEffectiveEntries()'), 'copy/preview/application must use the derived output');
 assert(html.includes('元PNGタグ'), 'original and effective tag counts should be visible');
 assert(html.includes('PNGの元タグだけに戻す'), 'there must be a safe way to remove temporary overrides');
+assert(html.includes("typeof tagView!=='undefined'&&tagView==='pngEditor'"), 'PNG editor apply must use its independent transfer path');
+assert(html.includes('pngAppliedOutputMode=true'), 'applying PNG output must mark the form as PNG-derived');
+assert(html.includes('function pngEditorEntryAlreadyApplied'), 'repeated PNG application needs exact-tag detection');
+assert(html.includes('pngEditorApplyAllowDuplicate=!pngAppliedOutputMode'), 'the first transfer must preserve the PNG tag sequence while repeats are deduplicated');
+assert(html.includes('applyPngEditorTagEntry(entry)'), 'PNG-derived tags must be routed to additional output arrays');
+
+// The direct editor output and the form output use different whitespace, but
+// their ordered tag content must be identical after automatic duplicates are
+// suppressed.
+const promptPartsStart = html.indexOf('function promptPartsText(parts)');
+const promptPartsEnd = html.indexOf('\nfunction buildPrompts()', promptPartsStart);
+assert(promptPartsStart >= 0 && promptPartsEnd > promptPartsStart, 'promptPartsText implementation must be present');
+const promptPartsFactory = new Function('metadataPromptTags', 'metadataTagKey', 'pngAppliedOutputMode', `${html.slice(promptPartsStart, promptPartsEnd)}; return promptPartsText;`);
+const metadataPromptTags = value => String(value).split(/[,，\n]/).map(item => item.trim()).filter(Boolean);
+const metadataTagKey = value => String(value).replace(/[()]/g, '').trim().toLowerCase().replace(/\s+/g, ' ');
+const promptPartsText = promptPartsFactory(metadataPromptTags, metadataTagKey, true);
+const direct = 'hand-drawn anime style, slightly rough lineart, shy smile, heart-shaped pupils, masterpiece';
+const transferred = promptPartsText([
+  { value: 'masterpiece, hand-drawn anime style, shy smile', source: 'automatic' },
+  { value: 'hand-drawn anime style, slightly rough lineart, shy smile, heart-shaped pupils, masterpiece', source: 'additional' }
+]);
+const normalizePrompt = value => metadataPromptTags(value).map(metadataTagKey).join('|');
+assert.strictEqual(normalizePrompt(transferred), normalizePrompt(direct), 'PNG direct copy and form output must contain the same ordered tags without automatic duplicates');
 
 console.log('PNG editor independent screen and temporary override contract: OK');

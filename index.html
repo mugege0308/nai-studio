@@ -702,46 +702,48 @@ function girl2Specific(){
  return fields.map(id=>byId(id).value.trim()).filter(Boolean);
 }
 // NovelAI V5: ベースプロンプトには人数と場面、個別には girl/boy と各人物の特徴を入れる。
+// PNG編集から反映したときだけ、追加されたPNGタグを優先し、自動生成タグの同一項目を抑制する。
+function promptPartsText(parts){
+ const pngDerived=typeof pngAppliedOutputMode!=='undefined'&&pngAppliedOutputMode;
+ if(!pngDerived)return parts.map(item=>item.value).filter(Boolean).join(',\n');
+ const imported=new Set();for(const item of parts)if(item.source==='additional')for(const tag of metadataPromptTags(item.value))imported.add(metadataTagKey(tag));
+ const seenAuto=new Set(),result=[];for(const item of parts)for(const tag of metadataPromptTags(item.value)){const key=metadataTagKey(tag);if(item.source==='additional'){result.push(tag);continue}if(imported.has(key)||seenAuto.has(key))continue;seenAuto.add(key);result.push(tag)}return result.join(',\n');
+}
 function buildPrompts(){
- const base=[],female=[],male=[];
- const m=byId('maleMode').value;
- const hasMale=m==='visible'||m==='faceless';
- const hasGirl2=m==='girl2';
- const comp=getComposition();
- if(comp.count)base.push(comp.count);
- else if(byId('useSolo').checked)base.push('1girl, solo');
- if(byId('useQuality').checked)base.push('masterpiece, best quality, very aesthetic');
- for(const id of ['pose','scene','camera'])if(byId(id).value.trim())base.push(byId(id).value.trim());
- if(byId('extras').value.trim())base.push(byId('extras').value.trim().replace(/^,|,$/g,''));
- if(comp.tags)base.push(comp.tags);
- if(!hasMale&&!hasGirl2&&m!=='none'&&byId('maleAction').value.trim())base.push(byId('maleAction').value.trim());
- if(extraTags.length)base.push(extraTags.join(', '));
- const style=buildStyle();if(style)base.push(style);
- const pasted=byId('pasteTags').value.trim().replace(/^\s*[,，]+|[,，]+\s*$/g,'').replace(/\n+/g,', ');
- if(pasted)base.push(pasted);
-  female.push('girl');
-  if(comp.kind==='femalePov'&&comp.facingTags)female.push(comp.facingTags);
-  if(comp.kind==='femalePov'&&comp.targetPrompt)female.push(comp.targetPrompt);
- if(byId('character').value.trim())female.push(byId('character').value.trim());
- for(const id of ['outfit','expression','femaleExtras'])if(byId(id).value.trim())female.push(byId(id).value.trim());
- if(femaleTags.length)female.push(femaleTags.join(', '));
+ const base=[],female=[],male=[],push=(list,value,source='automatic')=>{if(value&&String(value).trim())list.push({value:String(value).trim(),source})},pushMany=(list,values,source='automatic')=>values.forEach(value=>push(list,value,source));
+ const m=byId('maleMode').value,hasMale=m==='visible'||m==='faceless',hasGirl2=m==='girl2',comp=getComposition(),extraSource='additional';
+ if(comp.count)push(base,comp.count);else if(byId('useSolo').checked)push(base,'1girl, solo');
+ if(byId('useQuality').checked)push(base,'masterpiece, best quality, very aesthetic');
+ for(const id of ['pose','scene','camera'])if(byId(id).value.trim())push(base,byId(id).value);
+ if(byId('extras').value.trim())push(base,byId('extras').value.trim().replace(/^,|,$/g,''));
+ if(comp.tags)push(base,comp.tags);
+ if(!hasMale&&!hasGirl2&&m!=='none'&&byId('maleAction').value.trim())push(base,byId('maleAction').value);
+ if(extraTags.length)pushMany(base,extraTags,extraSource);
+ const style=buildStyle();if(style)push(base,style);
+ const pasted=byId('pasteTags').value.trim().replace(/^\s*[,，]+|[,，]+\s*$/g,'').replace(/\n+/g,', ');if(pasted)push(base,pasted,extraSource);
+ push(female,'girl');
+ if(comp.kind==='femalePov'&&comp.facingTags)push(female,comp.facingTags);
+ if(comp.kind==='femalePov'&&comp.targetPrompt)push(female,comp.targetPrompt);
+ if(byId('character').value.trim())push(female,byId('character').value);
+ for(const id of ['outfit','expression','femaleExtras'])if(byId(id).value.trim())push(female,byId(id).value);
+ if(femaleTags.length)pushMany(female,femaleTags,extraSource);
  if(hasMale){
-   male.push('boy', ...maleSpecific());
-   if(comp.facingTags)male.push(comp.facingTags);
-   if(maleTags.length)male.push(maleTags.join(', '));
+   push(male,'boy');pushMany(male,maleSpecific());
+   if(comp.facingTags)push(male,comp.facingTags);
+   if(maleTags.length)pushMany(male,maleTags,extraSource);
  }else if(hasGirl2){
-   male.push('girl');
+   push(male,'girl');
    if(comp.kind==='femalePov'){
-    if(comp.cameraPrompt)male.push(comp.cameraPrompt);
-    male.push(...femalePovCharacter2Specific());
-    if(girl2Tags.length)male.push(girl2Tags.join(', '));
+    if(comp.cameraPrompt)push(male,comp.cameraPrompt);
+    pushMany(male,femalePovCharacter2Specific());
+    if(girl2Tags.length)pushMany(male,girl2Tags,extraSource);
    }else{
-    male.push(...girl2Specific());
-    if(comp.facingTags)male.push(comp.facingTags);
-    if(girl2Tags.length)male.push(girl2Tags.join(', '));
+    pushMany(male,girl2Specific());
+    if(comp.facingTags)push(male,comp.facingTags);
+    if(girl2Tags.length)pushMany(male,girl2Tags,extraSource);
    }
  }
- return {base:base.filter(Boolean).join(',\n'),female:female.filter(Boolean).join(',\n'),male:male.filter(Boolean).join(',\n')};
+ return {base:promptPartsText(base),female:promptPartsText(female),male:promptPartsText(male)};
 }
 
 function refreshPov(){
@@ -835,7 +837,7 @@ function clearAdditionalTags(){
  const negativeSearchTags=[...searchAddedArray('negative')];
  extraTags=[];femaleTags=[];maleTags=[];girl2Tags=[];
  byId('pasteTags').value='';byId('femaleExtras').value='';byId('maleExtra').value='';byId('girl2Extra').value='';
-  searchAddedTags=emptySearchAdded();searchAddedTags.negative=negativeSearchTags;favoriteAddedTags=emptySearchAdded();
+  searchAddedTags=emptySearchAdded();searchAddedTags.negative=negativeSearchTags;favoriteAddedTags=emptySearchAdded();pngAppliedOutputMode=false;
 }
 const DEFAULT_TAG_SEARCH_MODE='local';
 let searchMode=DEFAULT_TAG_SEARCH_MODE,displayLimit=60,remoteTags=[],remoteError='',remoteLoading=false,remoteLastQuery='',favoriteTags=[];
@@ -1315,9 +1317,9 @@ byId('addManualFavorite').onclick=openManualFavorite;byId('manualFavoriteType').
 byId('favoriteChooserType').addEventListener('change',updateFavoriteChooserFolders);byId('saveFavoriteChoice').onclick=saveFavoriteChoice;byId('closeFavoriteChooser').onclick=closeFavoriteChooser;byId('removeFavoriteChoice').onclick=()=>{if(favoriteChooserState&&removeFavoriteEverywhere(favoriteChooserState.tag)){closeFavoriteChooser();renderFavorites();renderTagList();setFavoriteStatus('お気に入りから削除しました')}};
 
 const stateIds=['character','outfit','pose','scene','expression','camera','viewMode','maleMode','character2Pov','character2Facing','maleCharacter','maleAppearance','maleOutfit','maleAction','maleExtra','girl2Character','girl2Appearance','girl2Outfit','girl2Action','girl2Extra','pasteTags','style','extras','femaleExtras','negative','seed','useQuality','useSolo','stylePartsMode','styleDirectMode','styleDirectTags','styleArtistOther',...partIds];
-function saveState(){try{const data={};for(const id of stateIds)data[id]=byId(id).type==='checkbox'?byId(id).checked:byId(id).value;data.extraTags=extraTags;data.femaleTags=femaleTags;data.maleTags=maleTags;data.girl2Tags=girl2Tags;data.searchAddedTags=searchAddedTags;data.favoriteAddedTags=favoriteAddedTags;data.panelCollapse=panelCollapseState();localStorage.setItem('nai_prompt_studio_v13',JSON.stringify(data));document.dispatchEvent(new Event('nai:statechanged'))}catch(e){}}
- function loadState(){try{const source=JSON.parse(localStorage.getItem('nai_prompt_studio_v13')||localStorage.getItem('nai_prompt_studio_v12')||localStorage.getItem('nai_prompt_studio_v11')||localStorage.getItem('nai_prompt_studio_v10')||localStorage.getItem('nai_prompt_studio_v9')||localStorage.getItem('nai_prompt_studio_v8')||localStorage.getItem('nai_prompt_studio_v7')||localStorage.getItem('nai_prompt_studio_v6')||localStorage.getItem('nai_prompt_studio_v5')||localStorage.getItem('nai_prompt_studio_v4')||localStorage.getItem('nai_prompt_studio_v1')||'null');if(!source)return;const data=migratePovState(source);for(const id of stateIds){if(!(id in data))continue;const el=byId(id);if(el.type==='checkbox')el.checked=Boolean(data[id]);else if(el.tagName!=='SELECT'||[...el.options].some(opt=>opt.value===data[id]))el.value=data[id]}extraTags=Array.isArray(data.extraTags)?data.extraTags.filter(x=>typeof x==='string').slice(0,40):[];femaleTags=Array.isArray(data.femaleTags)?data.femaleTags.filter(x=>typeof x==='string').slice(0,40):[];maleTags=Array.isArray(data.maleTags)?data.maleTags.filter(x=>typeof x==='string').slice(0,40):[];girl2Tags=Array.isArray(data.girl2Tags)?data.girl2Tags.filter(x=>typeof x==='string').slice(0,40):[];searchAddedTags=normalizeSearchAdded(data.searchAddedTags);favoriteAddedTags=normalizeSearchAdded(data.favoriteAddedTags);applyPanelCollapse(data.panelCollapse)}catch(e){}}
-function setValues(dict){dict={maleMode:'none',character2Pov:'normal',character2Facing:'normal',maleCharacter:'',maleAppearance:'',maleOutfit:'',maleAction:'',maleExtra:'',girl2Character:'',girl2Appearance:'',girl2Outfit:'',girl2Action:'',girl2Extra:'',pasteTags:'',femaleExtras:'',...dict};for(const [id,value] of Object.entries(dict)){if(byId(id)){if(byId(id).type==='checkbox')byId(id).checked=Boolean(value);else byId(id).value=value}}extraTags=[];femaleTags=[];maleTags=[];girl2Tags=[];searchAddedTags=emptySearchAdded();favoriteAddedTags=emptySearchAdded();refresh();byId('copyStatus').textContent='プリセットを適用しました'}
+function saveState(){try{const data={};for(const id of stateIds)data[id]=byId(id).type==='checkbox'?byId(id).checked:byId(id).value;data.extraTags=extraTags;data.femaleTags=femaleTags;data.maleTags=maleTags;data.girl2Tags=girl2Tags;data.searchAddedTags=searchAddedTags;data.favoriteAddedTags=favoriteAddedTags;data.pngAppliedOutputMode=pngAppliedOutputMode;data.panelCollapse=panelCollapseState();localStorage.setItem('nai_prompt_studio_v13',JSON.stringify(data));document.dispatchEvent(new Event('nai:statechanged'))}catch(e){}}
+ function loadState(){try{const source=JSON.parse(localStorage.getItem('nai_prompt_studio_v13')||localStorage.getItem('nai_prompt_studio_v12')||localStorage.getItem('nai_prompt_studio_v11')||localStorage.getItem('nai_prompt_studio_v10')||localStorage.getItem('nai_prompt_studio_v9')||localStorage.getItem('nai_prompt_studio_v8')||localStorage.getItem('nai_prompt_studio_v7')||localStorage.getItem('nai_prompt_studio_v6')||localStorage.getItem('nai_prompt_studio_v5')||localStorage.getItem('nai_prompt_studio_v4')||localStorage.getItem('nai_prompt_studio_v1')||'null');if(!source)return;const data=migratePovState(source);for(const id of stateIds){if(!(id in data))continue;const el=byId(id);if(el.type==='checkbox')el.checked=Boolean(data[id]);else if(el.tagName!=='SELECT'||[...el.options].some(opt=>opt.value===data[id]))el.value=data[id]}extraTags=Array.isArray(data.extraTags)?data.extraTags.filter(x=>typeof x==='string').slice(0,40):[];femaleTags=Array.isArray(data.femaleTags)?data.femaleTags.filter(x=>typeof x==='string').slice(0,40):[];maleTags=Array.isArray(data.maleTags)?data.maleTags.filter(x=>typeof x==='string').slice(0,40):[];girl2Tags=Array.isArray(data.girl2Tags)?data.girl2Tags.filter(x=>typeof x==='string').slice(0,40):[];searchAddedTags=normalizeSearchAdded(data.searchAddedTags);favoriteAddedTags=normalizeSearchAdded(data.favoriteAddedTags);pngAppliedOutputMode=Boolean(data.pngAppliedOutputMode);applyPanelCollapse(data.panelCollapse)}catch(e){}}
+function setValues(dict){dict={maleMode:'none',character2Pov:'normal',character2Facing:'normal',maleCharacter:'',maleAppearance:'',maleOutfit:'',maleAction:'',maleExtra:'',girl2Character:'',girl2Appearance:'',girl2Outfit:'',girl2Action:'',girl2Extra:'',pasteTags:'',femaleExtras:'',...dict};for(const [id,value] of Object.entries(dict)){if(byId(id)){if(byId(id).type==='checkbox')byId(id).checked=Boolean(value);else byId(id).value=value}}extraTags=[];femaleTags=[];maleTags=[];girl2Tags=[];searchAddedTags=emptySearchAdded();favoriteAddedTags=emptySearchAdded();pngAppliedOutputMode=false;refresh();byId('copyStatus').textContent='プリセットを適用しました'}
 const presets={
  default:{outfit:'',pose:'',scene:'',expression:'gentle smile, blush',camera:'cowboy shot, three-quarter view',viewMode:'normal',extras:'',femaleExtras:''},
  bath:{character:'saeki miria (mahou shoujo no majo saiban)',outfit:'cozy pajamas',pose:'sitting on bed',scene:'cozy bedroom, evening',expression:'gentle smile, blush',camera:'cowboy shot, three-quarter view',viewMode:'normal',extras:'after bath, towel around neck, damp hair ends',femaleExtras:''},
@@ -1373,7 +1375,7 @@ function normalizeSnapshotMetadata(value){
 function captureSettings(){
  const state={};
  for(const id of stateIds){const el=byId(id);state[id]=el.type==='checkbox'?el.checked:el.value}
-  state.extraTags=[...extraTags];state.femaleTags=[...femaleTags];state.maleTags=[...maleTags];state.girl2Tags=[...girl2Tags];state.searchAddedTags=normalizeSearchAdded(searchAddedTags);state.favoriteAddedTags=normalizeSearchAdded(favoriteAddedTags);state.panelCollapse=panelCollapseState();
+  state.extraTags=[...extraTags];state.femaleTags=[...femaleTags];state.maleTags=[...maleTags];state.girl2Tags=[...girl2Tags];state.searchAddedTags=normalizeSearchAdded(searchAddedTags);state.favoriteAddedTags=normalizeSearchAdded(favoriteAddedTags);state.pngAppliedOutputMode=pngAppliedOutputMode;state.panelCollapse=panelCollapseState();
  return state;
 }
 function applySettings(state,options={}){
@@ -1393,12 +1395,12 @@ function applySettings(state,options={}){
  ]){
   if(Array.isArray(state[key]))setter(state[key].filter(t=>typeof t==='string').slice(0,40));
  }
-  searchAddedTags=normalizeSearchAdded(state.searchAddedTags);favoriteAddedTags=normalizeSearchAdded(state.favoriteAddedTags);
+  searchAddedTags=normalizeSearchAdded(state.searchAddedTags);favoriteAddedTags=normalizeSearchAdded(state.favoriteAddedTags);pngAppliedOutputMode=Boolean(state.pngAppliedOutputMode);
   applyPanelCollapse(state.panelCollapse);
   lastStyleSnapshot=styleFields();
   if(options.refresh!==false)syncViewMode();
 }
-let importedNovelAIMetadata=null,importedNovelAIImageBytes=null,importedNovelAIFile=null,metadataImportUndoState=null;
+let importedNovelAIMetadata=null,importedNovelAIImageBytes=null,importedNovelAIFile=null,metadataImportUndoState=null,pngAppliedOutputMode=false;
 const METADATA_UNDO_KEY='nai_novelai_metadata_undo_v1';
 function metadataStatus(message,warning=false){const el=byId('metadataStatus');if(el){el.textContent=message;el.classList.toggle('metadata-warning',warning)}}
 function metadataText(value){return value===null||value===undefined||value===''?'（なし）':String(value)}
@@ -1484,16 +1486,39 @@ function updateMetadataTagDuplicates(rootId='metadataTagEditor',noteId='metadata
   for(const [destination,categoryGroups] of groups){const destinationKey=destination,stateOpen=metadataTagCollapseOpen(state,'destinations',destinationKey),destinationEntries=[...categoryGroups.values()].flat(),destinationWrap=document.createElement('section');destinationWrap.className='metadata-tag-collapse'+(stateOpen?'':' is-collapsed');const destinationHeader=metadataTagCollapseHeader(METADATA_TAG_DESTINATION_LABELS[destination],destinationEntries.length,stateOpen,'destinations',destinationKey,()=>{const next=!metadataTagCollapseOpen(state,'destinations',destinationKey);state.all=null;state.destinations[destinationKey]=next;metadataTagEntriesFromUI(rootId);renderMetadataTagEditor(metadataTagDraft,rootId,idPrefix)});destinationWrap.appendChild(destinationHeader);const destinationBody=document.createElement('div');destinationBody.className='metadata-tag-collapse-body';for(const [category,entries] of categoryGroups){const categoryKey=metadataTagCollapseKey(destination,category),categoryOpen=metadataTagCollapseOpen(state,'categories',categoryKey),categoryWrap=document.createElement('section');categoryWrap.className='metadata-tag-category'+(categoryOpen?'':' is-collapsed');const categoryHeader=metadataTagCollapseHeader(METADATA_TAG_CATEGORY_LABELS[category],entries.length,categoryOpen,'categories',categoryKey,()=>{const next=!metadataTagCollapseOpen(state,'categories',categoryKey);state.all=null;state.categories[categoryKey]=next;metadataTagEntriesFromUI(rootId);renderMetadataTagEditor(metadataTagDraft,rootId,idPrefix)});categoryWrap.appendChild(categoryHeader);const categoryBody=document.createElement('div');categoryBody.className='metadata-tag-category-body';const categoryList=document.createElement('div');categoryList.className='metadata-tag-list';entries.forEach(entry=>appendRow(categoryList,entry));categoryBody.appendChild(categoryList);categoryWrap.appendChild(categoryBody);destinationBody.appendChild(categoryWrap)}destinationWrap.appendChild(destinationBody);list.appendChild(destinationWrap)}root.appendChild(list);
   const addBox=document.createElement('div');addBox.className='metadata-tag-add';const newInput=document.createElement('input');newInput.id=idPrefix+'NewTag';newInput.placeholder='タグを追加（例: silver hair）';const newCategory=document.createElement('select');newCategory.id=idPrefix+'NewTagCategory';metadataTagOptions(newCategory,METADATA_TAG_CATEGORY_LABELS,'unclassified');const newDestination=document.createElement('select');newDestination.id=idPrefix+'NewTagDestination';metadataTagOptions(newDestination,METADATA_TAG_DESTINATION_LABELS,'common');const addButton=document.createElement('button');addButton.type='button';addButton.className='btn';addButton.textContent='＋ タグを追加';addButton.onclick=()=>{const tag=newInput.value.trim();if(!tag){metadataStatus('追加するタグを入力してください。',true);return}metadataTagDraft.entries.push(metadataMakeTagEntry(tag,'manual',0,newCategory.value,newDestination.value));renderMetadataTagEditor(metadataTagDraft,rootId,idPrefix);metadataStatus('分類プレビューへタグを追加しました')};addBox.append(newInput,newCategory,newDestination,addButton);root.appendChild(addBox);const duplicate=document.createElement('p');duplicate.id=idPrefix+'TagDuplicateNote';duplicate.className='metadata-tag-note';root.appendChild(duplicate);updateMetadataTagDuplicates(rootId,idPrefix+'TagDuplicateNote');
  }
-function metadataAppendPromptText(id,tag){const el=byId(id);if(!el)return;const current=metadataPromptTags(el.value),key=metadataTagKey(tag);if(current.some(item=>metadataTagKey(item)===key))return;current.push(tag);el.value=current.join(', ')}
-function metadataAppendTagArray(array,tag){if(!array.some(item=>metadataTagKey(item)===metadataTagKey(tag)))array.push(tag)}
+function metadataAppendPromptText(id,tag,allowDuplicate=false){const el=byId(id);if(!el)return;const current=metadataPromptTags(el.value),key=metadataTagKey(tag);if(!allowDuplicate&&current.some(item=>metadataTagKey(item)===key))return;current.push(tag);el.value=current.join(', ')}
+function metadataAppendTagArray(array,tag,allowDuplicate=false){if(allowDuplicate||!array.some(item=>metadataTagKey(item)===metadataTagKey(tag)))array.push(tag)}
 function metadataCharacter2Field(){return byId('maleMode').value==='girl2'?'girl2Character':'maleCharacter'}
 function metadataCharacter2Array(){return byId('maleMode').value==='girl2'?girl2Tags:maleTags}
+let pngEditorApplyAllowDuplicate=false;
 function applyMetadataTagEntry(entry,warnings){
  const tag=entry.tag.trim();if(!tag||!entry.keep)return;
+ if(typeof tagView!=='undefined'&&tagView==='pngEditor'){
+  if(!pngEditorApplyAllowDuplicate&&pngEditorEntryAlreadyApplied(entry))return;
+  pngAppliedOutputMode=true;applyPngEditorTagEntry(entry);return;
+ }
  if(entry.destination==='negative'){metadataAppendPromptText('negative',tag);return}
  if(entry.destination==='character1'){if(entry.category==='character')metadataAppendPromptText('character',tag);else metadataAppendTagArray(femaleTags,tag);return}
  if(entry.destination==='character2'){if(entry.category==='character')metadataAppendPromptText(metadataCharacter2Field(),tag);else metadataAppendTagArray(metadataCharacter2Array(),tag);if(byId('maleMode').value==='none')warnings.push('キャラ2のタグを保持しました。2人目を有効にすると出力されます。');return}
  metadataAppendTagArray(extraTags,tag);
+}
+function applyPngEditorTagEntry(entry){
+ const tag=entry.tag.trim();if(!tag||entry.keep===false)return;
+ if(entry.destination==='negative'){metadataAppendPromptText('negative',tag);return}
+ if(entry.destination==='character1'){metadataAppendTagArray(femaleTags,tag,true);return}
+ if(entry.destination==='character2'){metadataAppendTagArray(byId('maleMode').value==='girl2'?girl2Tags:maleTags,tag,true);return}
+ metadataAppendTagArray(extraTags,tag,true);
+}
+function pngEditorEntryAlreadyApplied(entry){
+ const tag=entry.tag.trim();if(!tag)return true;const key=metadataTagKey(tag);
+ if(entry.destination==='negative')return metadataPromptTags(byId('negative').value).some(item=>metadataTagKey(item)===key);
+ if(entry.destination==='character1')return femaleTags.some(item=>metadataTagKey(item)===key);
+ if(entry.destination==='character2')return (byId('maleMode').value==='girl2'?girl2Tags:maleTags).some(item=>metadataTagKey(item)===key);
+ return extraTags.some(item=>metadataTagKey(item)===key);
+}
+function applyPngEditorEntries(entries){
+ const repeated=pngAppliedOutputMode;pngAppliedOutputMode=true;
+ entries.forEach(entry=>{if(repeated&&pngEditorEntryAlreadyApplied(entry))return;applyPngEditorTagEntry(entry)})
 }
 function applyMetadataTagDraft(rootId='metadataTagEditor',entriesOverride=null){
  if(!metadataTagDraft||!importedNovelAIMetadata)return;if(byId('metadataInspectOnly').checked){metadataStatus('確認モード中です。反映する場合は確認モードをOFFにしてください。',true);return}
@@ -1532,7 +1557,7 @@ function renderNovelAIMetadata(meta){
  const unsupported=document.createElement('p');unsupported.className='hint metadata-unsupported';unsupported.textContent='モデル、解像度、Steps、Guidance、Samplerなどは現在のStudioに編集欄がないため自動適用しません。読み込んだPNGから書き出す場合は確認できた値だけを引き継ぎます。';root.appendChild(unsupported);
   renderMetadataTagEditor(metadataTagDraft);renderPngPromptEditor();byId('copyMetadataJson').disabled=false;updateMetadataApplyState();
 }
-function persistMetadataUndo(){try{if(metadataImportUndoState)sessionStorage.setItem(METADATA_UNDO_KEY,JSON.stringify(metadataImportUndoState));else sessionStorage.removeItem(METADATA_UNDO_KEY)}catch(_){}byId('restoreMetadata').disabled=!metadataImportUndoState}
+ function persistMetadataUndo(){if(typeof tagView!=='undefined'&&tagView==='pngEditor'){pngEditorApplyAllowDuplicate=!pngAppliedOutputMode;setTimeout(()=>{pngEditorApplyAllowDuplicate=false},0)}try{if(metadataImportUndoState)sessionStorage.setItem(METADATA_UNDO_KEY,JSON.stringify(metadataImportUndoState));else sessionStorage.removeItem(METADATA_UNDO_KEY)}catch(_){}byId('restoreMetadata').disabled=!metadataImportUndoState}
 function readMetadataUndo(){try{const value=JSON.parse(sessionStorage.getItem(METADATA_UNDO_KEY)||'null');metadataImportUndoState=value&&typeof value==='object'&&!Array.isArray(value)?value:null}catch(_){metadataImportUndoState=null}byId('restoreMetadata').disabled=!metadataImportUndoState}
 function applyNovelAIMetadata(){
  if(!importedNovelAIMetadata)return;if(byId('metadataInspectOnly').checked){metadataStatus('確認モード中です。反映する場合は確認モードをOFFにしてください。',true);return}
