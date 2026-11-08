@@ -7,6 +7,8 @@ const cloud = fs.readFileSync('cloud-sync.js', 'utf8');
 
 for (const token of [
   'extraTagPresetSelect',
+  'extraTagPresetDestination',
+  'extraTagPresetSource',
   'applyExtraTagPresets',
   'saveExtraTagPreset',
   'manageExtraTagPresets',
@@ -22,6 +24,11 @@ assert.ok(html.includes('extraTagPresets:normalizeExtraTagPresets(extraTagPreset
 assert.ok(html.includes('if(Array.isArray(payload.extraTagPresets))'), 'JSON import must restore extra tag presets');
 assert.ok(html.includes('readExtraTagPresets();'), 'startup must load extra tag presets');
 assert.ok(html.includes('setupExtraTagPresetUI();'), 'startup must wire extra tag preset UI');
+assert.ok(html.indexOf('id="extraTagPresetBox"') > html.indexOf('id="favoritesPanel"'), 'extra tag presets must be located with favorites');
+assert.ok(html.indexOf('id="extraTagPresetBox"') < html.indexOf('id="pngEditorPanel"'), 'extra tag presets must not be in the direct-paste panel');
+assert.ok(html.includes('value="female">キャラ1の追加タグ'), 'character 1 destination must be available');
+assert.ok(html.includes('value="character2">キャラ2の追加タグ'), 'character 2 destination must be available');
+assert.ok(html.includes('value="paste">直接貼り付け欄'), 'direct paste must be an independent save source');
 assert.ok(cloud.includes('extraTagPresets:normalizeExtraTagPresets(extraTagPresets)'), 'Firebase profile must include extra tag presets');
 assert.ok(cloud.includes('if(Array.isArray(value.extraTagPresets))'), 'Firebase profile restore must include extra tag presets');
 assert.ok(!html.includes('favoriteTags=normalizeExtraTagPresets'), 'extra presets must not overwrite single-tag favorites');
@@ -34,15 +41,19 @@ const context = {
   localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
   document: { dispatchEvent: () => {} },
   window: { prompt: () => null, confirm: () => true },
-  byId: id => id === 'pasteTags' ? { value: 'beta, beta' } : null,
+  byId: id => id === 'pasteTags' ? { value: 'beta, beta' } : id === 'maleMode' ? { value: 'visible' } : id === 'femaleExtras' ? { value: '' } : id === 'maleExtra' ? { value: '' } : id === 'girl2Extra' ? { value: '' } : null,
   refresh: () => {}
 };
-vm.runInNewContext(`const normalize=s=>String(s).toLowerCase().normalize('NFKC').replace(/[_\\-]/g,' ').replace(/\\s+/g,' ').trim(); let extraTags=['alpha']; ${implementation} this.normalizeExtraTagPreset=normalizeExtraTagPreset; this.splitExtraTagPresetTags=splitExtraTagPresetTags; this.appendExtraTagPresetTags=appendExtraTagPresetTags; this.getExtraTags=()=>extraTags;`, context);
+vm.runInNewContext(`const normalize=s=>String(s).toLowerCase().normalize('NFKC').replace(/[_\\-]/g,' ').replace(/\\s+/g,' ').trim(); let extraTags=['alpha'],femaleTags=[],maleTags=[],girl2Tags=[]; ${implementation} this.normalizeExtraTagPreset=normalizeExtraTagPreset; this.splitExtraTagPresetTags=splitExtraTagPresetTags; this.appendExtraTagPresetTags=appendExtraTagPresetTags; this.getArrays=()=>({extraTags,femaleTags,maleTags,girl2Tags});`, context);
 
 const normalized = context.normalizeExtraTagPreset({ name: 'test', tags: ['alpha', 'beta', 'alpha', ' gamma '] });
 assert.deepStrictEqual(Array.from(normalized.tags), ['alpha', 'beta', 'gamma'], 'preset tags must preserve order and remove duplicates');
 assert.deepStrictEqual(Array.from(context.splitExtraTagPresetTags('alpha, , beta\ngamma, beta')), ['alpha', 'beta', 'gamma'], 'empty and duplicate tags must be ignored');
-assert.deepStrictEqual(Array.from(context.appendExtraTagPresetTags(['alpha', 'beta', 'gamma'])), ['gamma'], 'applying a preset must skip tags already in committed or pasted input');
-assert.deepStrictEqual(Array.from(context.getExtraTags()), ['alpha', 'gamma'], 'applying a preset must append only new tags');
+assert.deepStrictEqual(Array.from(context.appendExtraTagPresetTags(['alpha', 'beta', 'gamma'])), ['gamma'], 'common application must skip tags already in committed or pasted input');
+assert.deepStrictEqual(Array.from(context.getArrays().extraTags), ['alpha', 'gamma'], 'common application must append only new tags');
+assert.deepStrictEqual(Array.from(context.appendExtraTagPresetTags(['blush', 'blush', 'blue eyes'], 'female')), ['blush', 'blue eyes'], 'character 1 application must preserve order and dedupe');
+assert.deepStrictEqual(Array.from(context.getArrays().femaleTags), ['blush', 'blue eyes'], 'character 1 application must use the character 1 array');
+assert.deepStrictEqual(Array.from(context.appendExtraTagPresetTags(['tall', 'short black hair'], 'character2')), ['tall', 'short black hair'], 'character 2 application must resolve the active male destination');
+assert.deepStrictEqual(Array.from(context.getArrays().maleTags), ['tall', 'short black hair'], 'character 2 application must use the active character 2 array');
 
 console.log('extra tag presets, backup, Firebase and dedupe contract: OK');

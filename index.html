@@ -311,24 +311,6 @@
        <p class="hint">ここに貼ったタグは「共通プロンプト」に反映。1人目・2人目の追加タグは各個別欄を使ってね。</p>
      </div>
      <div class="actions" style="margin:9px 0 13px"><button type="button" class="btn" id="commitPastedTags">＋ 1個ずつのタグに取り込む</button><button type="button" class="btn ghost" id="clearPastedTags">貼り付け欄をクリア</button></div>
-     <section class="extra-tag-presets" id="extraTagPresetBox" aria-labelledby="extraTagPresetTitle">
-       <div class="outheader"><h3 id="extraTagPresetTitle">追加タグプリセット</h3><span class="small muted" id="extraTagPresetStatus"></span></div>
-       <div class="extra-tag-preset-toolbar">
-         <select id="extraTagPresetSelect" multiple size="3" aria-label="追加タグプリセットを選択"></select>
-         <button type="button" class="btn" id="applyExtraTagPresets">プリセットから追加</button>
-         <button type="button" class="btn" id="saveExtraTagPreset">現在のタグをプリセット保存</button>
-         <button type="button" class="btn ghost" id="manageExtraTagPresets">プリセット管理</button>
-       </div>
-       <div id="extraTagPresetManage" class="extra-tag-preset-manage hide">
-         <div class="extra-tag-preset-form">
-           <input id="extraTagPresetName" type="text" maxlength="48" placeholder="プリセット名（例：柔らかい表情）">
-           <input id="extraTagPresetFolder" type="text" maxlength="40" placeholder="フォルダ（任意）">
-           <textarea id="extraTagPresetDescription" maxlength="300" placeholder="説明（任意）"></textarea>
-         </div>
-         <div class="actions"><button type="button" class="btn primary" id="saveExtraTagPresetForm">この内容で保存</button></div>
-         <div id="extraTagPresetList" class="extra-tag-preset-list"></div>
-       </div>
-     </section>
      <h3>検索から選んだタグ</h3><p class="small muted">タグ検索画面で追加先を選べます。ここでタップすると個別に削除できます。</p><div id="selectedTags" class="chips"></div>
      <div class="actions" style="margin-top:12px"><button class="btn ghost" id="goTags" type="button">＋ タグを探す</button><button class="btn ghost" id="clearSearchTags" type="button">検索タグを一括解除</button><button class="btn ghost" id="clearTags" type="button">追加タグをすべてクリア</button></div>
    </section>
@@ -465,6 +447,29 @@
  </section>
  <section class="panel favorite-manager hide" id="favoritesPanel">
   <div><h2>お気に入りを整理する</h2><p class="small muted">作品キャラクターと属性・構図タグをフォルダで管理できます。旧お気に入りは「未分類」に移行されています。</p></div>
+  <section class="extra-tag-presets" id="extraTagPresetBox" aria-labelledby="extraTagPresetTitle">
+    <div class="outheader"><h3 id="extraTagPresetTitle">追加タグプリセット</h3><span class="small muted" id="extraTagPresetStatus"></span></div>
+    <p class="small muted">お気に入りの単体タグとは別に、複数タグをセットで管理します。現在の入力欄を選んで保存し、追加先を選んで適用できます。</p>
+    <div class="extra-tag-preset-toolbar">
+      <div class="field" style="flex:1 1 220px"><label for="extraTagPresetSelect">追加するプリセット（複数選択可）</label><select id="extraTagPresetSelect" multiple size="3" aria-label="追加タグプリセットを選択"></select></div>
+      <div class="field" style="flex:1 1 180px"><label for="extraTagPresetDestination">適用先</label><select id="extraTagPresetDestination"><option value="positive">共通プロンプト</option><option value="female">キャラ1の追加タグ</option><option value="character2">キャラ2の追加タグ（現在の種類）</option></select></div>
+      <button type="button" class="btn" id="applyExtraTagPresets">プリセットから追加</button>
+      <button type="button" class="btn" id="saveExtraTagPreset">現在のタグをプリセット保存</button>
+      <button type="button" class="btn ghost" id="manageExtraTagPresets">プリセット管理</button>
+    </div>
+    <div class="extra-tag-preset-form" style="margin-top:10px">
+      <label class="field"><span class="small muted">保存元</span><select id="extraTagPresetSource"><option value="positive">共通プロンプト</option><option value="female">キャラ1の追加タグ</option><option value="character2">キャラ2の追加タグ（現在の種類）</option><option value="paste">直接貼り付け欄</option></select></label>
+    </div>
+    <div id="extraTagPresetManage" class="extra-tag-preset-manage hide">
+      <div class="extra-tag-preset-form">
+        <input id="extraTagPresetName" type="text" maxlength="48" placeholder="プリセット名（例：柔らかい表情）">
+        <input id="extraTagPresetFolder" type="text" maxlength="40" placeholder="フォルダ（任意）">
+        <textarea id="extraTagPresetDescription" maxlength="300" placeholder="説明（任意）"></textarea>
+      </div>
+      <div class="actions"><button type="button" class="btn primary" id="saveExtraTagPresetForm">この内容で保存</button></div>
+      <div id="extraTagPresetList" class="extra-tag-preset-list"></div>
+    </div>
+  </section>
   <div class="favorite-toolbar">
    <div class="field"><label for="favoriteFolderType">保存先の種類</label><select id="favoriteFolderType"><option value="works">作品</option><option value="attributes">属性・構図</option></select></div>
    <div class="field"><label for="favoriteFolderSelect">表示するフォルダ</label><select id="favoriteFolderSelect"></select></div>
@@ -996,19 +1001,35 @@ function persistExtraTagPresets(){
  catch(error){extraTagPresetStorageError=true;try{if(previous===null)localStorage.removeItem(EXTRA_TAG_PRESETS_KEY);else localStorage.setItem(EXTRA_TAG_PRESETS_KEY,previous)}catch(_){}setExtraTagPresetStatus('追加タグプリセットを保存できませんでした。既存データは変更していません。',true);return false}
 }
 function readExtraTagPresets(){try{const raw=JSON.parse(localStorage.getItem(EXTRA_TAG_PRESETS_KEY)||'null');if(Array.isArray(raw))extraTagPresets=normalizeExtraTagPresets(raw)}catch(_){extraTagPresets=[]}}
-function currentExtraTagPresetTags(){return splitExtraTagPresetTags([...extraTags,...String(byId('pasteTags')?.value||'').split(/[,，\n]+/)] )}
-function appendExtraTagPresetTags(tags){
- const existing=new Set([...extraTags,...String(byId('pasteTags')?.value||'').split(/[,，\n]+/).map(tag=>tag.trim()).filter(Boolean)].map(normalize));const added=[];
- for(const tag of splitExtraTagPresetTags(tags))if(!existing.has(normalize(tag))){extraTags.push(tag);existing.add(normalize(tag));added.push(tag)}
+function resolveExtraTagPresetDestination(mode,action='適用'){
+ if(mode!=='character2')return mode;
+ const current=byId('maleMode')?.value||'none';
+ if(current==='none'){setExtraTagPresetStatus('キャラ2が未使用のため、'+action+'できません。先に2人目の種類を選択してください。',true);return ''}
+ return current==='girl2'?'girl2':'male';
+}
+function extraTagPresetArray(destination){return destination==='female'?femaleTags:destination==='male'?maleTags:destination==='girl2'?girl2Tags:extraTags}
+function extraTagPresetFieldId(destination){return destination==='female'?'femaleExtras':destination==='male'?'maleExtra':destination==='girl2'?'girl2Extra':'pasteTags'}
+function extraTagPresetFieldTags(destination){return splitExtraTagPresetTags(byId(extraTagPresetFieldId(destination))?.value||'')}
+function extraTagPresetSourceTags(source){
+ if(source==='paste')return extraTagPresetFieldTags('positive');
+ const destination=resolveExtraTagPresetDestination(source,'保存');if(!destination)return [];
+ return splitExtraTagPresetTags(extraTagPresetArray(destination));
+}
+function currentExtraTagPresetTags(){return extraTagPresetSourceTags(byId('extraTagPresetSource')?.value||'positive')}
+function appendExtraTagPresetTags(tags,destinationMode=byId('extraTagPresetDestination')?.value||'positive'){
+ const destination=resolveExtraTagPresetDestination(destinationMode);if(!destination)return [];
+ const target=extraTagPresetArray(destination),existing=new Set([...target,...extraTagPresetFieldTags(destination)].map(normalize)),added=[];
+ for(const tag of splitExtraTagPresetTags(tags))if(!existing.has(normalize(tag))){target.push(tag);existing.add(normalize(tag));added.push(tag)}
  return added;
 }
 function applyExtraTagPresetById(id){
- const preset=extraTagPresets.find(item=>item.id===id);if(!preset)return 0;const added=appendExtraTagPresetTags(preset.tags);refresh();renderExtraTagPresetUI();setExtraTagPresetStatus(added.length?'「'+preset.name+'」から'+added.length+'件を追加しました':'既存タグと重複するため追加はありません');return added.length;
+ const preset=extraTagPresets.find(item=>item.id===id);if(!preset)return 0;const destination=resolveExtraTagPresetDestination(byId('extraTagPresetDestination')?.value||'positive');if(!destination)return 0;const added=appendExtraTagPresetTags(preset.tags,destination);refresh();renderExtraTagPresetUI();setExtraTagPresetStatus(added.length?'「'+preset.name+'」から'+added.length+'件を追加しました':'選択した適用先には追加済みです');return added.length;
 }
 function applySelectedExtraTagPresets(){
  const select=byId('extraTagPresetSelect'),ids=[...(select?.selectedOptions||[])].map(option=>option.value);if(!ids.length){setExtraTagPresetStatus('追加するプリセットを選択してください。',true);return}
- let added=0;for(const id of ids){const preset=extraTagPresets.find(item=>item.id===id);if(preset)added+=appendExtraTagPresetTags(preset.tags).length}
- refresh();renderExtraTagPresetUI();setExtraTagPresetStatus(added?ids.length+'件のプリセットから'+added+'件を追加しました':'選択したタグはすべて追加済みです');
+ const destination=resolveExtraTagPresetDestination(byId('extraTagPresetDestination')?.value||'positive');if(!destination)return;
+ let added=0;for(const id of ids){const preset=extraTagPresets.find(item=>item.id===id);if(preset)added+=appendExtraTagPresetTags(preset.tags,destination).length}
+ refresh();renderExtraTagPresetUI();setExtraTagPresetStatus(added?ids.length+'件のプリセットから'+added+'件を追加しました':'選択した適用先には追加済みです');
 }
 function saveExtraTagPresetRecord(record){
  const previous=JSON.parse(JSON.stringify(extraTagPresets)),normalized=normalizeExtraTagPreset(record),index=extraTagPresets.findIndex(item=>item.id===normalized.id);
@@ -1019,14 +1040,14 @@ function saveExtraTagPresetRecord(record){
  renderExtraTagPresetUI();setExtraTagPresetStatus('追加タグプリセット「'+normalized.name+'」を保存しました');return true;
 }
 function saveCurrentExtraTagPreset(){
- const tags=currentExtraTagPresetTags();if(!tags.length){setExtraTagPresetStatus('先に追加タグを入力または取り込んでください。',true);return}
+ const source=byId('extraTagPresetSource')?.value||'positive';if(source==='character2'&&!resolveExtraTagPresetDestination(source,'保存'))return;const tags=currentExtraTagPresetTags();if(!tags.length){setExtraTagPresetStatus('先に選択した保存元へ追加タグを入力または取り込んでください。',true);return}
  const name=window.prompt('追加タグプリセットの名前', '追加タグセット '+(extraTagPresets.length+1));if(name===null)return;if(!name.trim()){setExtraTagPresetStatus('名前を入力してください。',true);return}
  const existing=extraTagPresets.find(item=>item.name===name.trim());if(existing&&!window.confirm('同名のプリセットを上書きしますか？'))return;
  saveExtraTagPresetRecord({id:existing?.id,name:name.trim(),folder:existing?.folder||'',description:existing?.description||'',tags,createdAt:existing?.createdAt,updatedAt:new Date().toISOString()});
 }
 function saveExtraTagPresetForm(){
  const name=byId('extraTagPresetName')?.value.trim();if(!name){setExtraTagPresetStatus('プリセット名を入力してください。',true);return}
- const tags=currentExtraTagPresetTags();const existing=extraTagPresets.find(item=>item.name===name);if(existing&&!window.confirm('同名のプリセットを上書きしますか？'))return;
+ const source=byId('extraTagPresetSource')?.value||'positive';if(source==='character2'&&!resolveExtraTagPresetDestination(source,'保存'))return;const tags=currentExtraTagPresetTags();if(!tags.length){setExtraTagPresetStatus('先に選択した保存元へ追加タグを入力または取り込んでください。',true);return}const existing=extraTagPresets.find(item=>item.name===name);if(existing&&!window.confirm('同名のプリセットを上書きしますか？'))return;
  if(saveExtraTagPresetRecord({id:existing?.id,name,folder:byId('extraTagPresetFolder')?.value||'',description:byId('extraTagPresetDescription')?.value||'',tags,createdAt:existing?.createdAt,updatedAt:new Date().toISOString()})){byId('extraTagPresetName').value='';byId('extraTagPresetFolder').value='';byId('extraTagPresetDescription').value=''}
 }
 function moveExtraTagPreset(id,delta){const index=extraTagPresets.findIndex(item=>item.id===id),next=index+delta;if(index<0||next<0||next>=extraTagPresets.length)return;[extraTagPresets[index],extraTagPresets[next]]=[extraTagPresets[next],extraTagPresets[index]];if(!persistExtraTagPresets())return;renderExtraTagPresetUI()}
