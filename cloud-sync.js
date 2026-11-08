@@ -117,6 +117,9 @@ function applyIncomingProfile(value){
   if(value.favoriteCollections && typeof value.favoriteCollections==='object' && !Array.isArray(value.favoriteCollections)){
    const previous=favoriteCollections;favoriteCollections=mergeFavoriteCollections(favoriteCollections,value.favoriteCollections);if(!persistFavoriteCollections(false))favoriteCollections=previous;renderFavorites();renderTagList();
   }
+  if(Array.isArray(value.extraTagPresets)){
+   const previous=extraTagPresets;extraTagPresets=normalizeExtraTagPresets(value.extraTagPresets);if(!persistExtraTagPresets())extraTagPresets=previous;renderExtraTagPresetUI();
+  }
   if(typeof value.draftImageData==='string')setDraftImage(isSavedImage(value.draftImageData)?value.draftImageData:'');
  }finally{suppress=false}
 }
@@ -147,7 +150,7 @@ function applyIncomingArtistTagPresets(value){
  if(value===null||value===undefined)return;
  suppress=true;try{const incoming=cleanRemoteArtistTagPresetObjects(value),previous=artistTagPresets;artistTagPresets=incoming;if(!persistArtistState()){artistTagPresets=previous;return}renderArtistTagUI();hydrateRemoteArtistAssets(incoming).catch(()=>{})}finally{suppress=false}
 }
-function profilePayload(){return {state:captureSettings(),customLooks,favoriteTags,favoriteCollections,draftImageData,updatedAt:firebase.database.ServerValue.TIMESTAMP,source:deviceId}}
+function profilePayload(){return {state:captureSettings(),customLooks,favoriteTags,favoriteCollections,extraTagPresets:normalizeExtraTagPresets(extraTagPresets),draftImageData,updatedAt:firebase.database.ServerValue.TIMESTAMP,source:deviceId}}
 function snapshotsPayload(){const out={};for(const s of savedSnapshots)out[s.id]={id:s.id,name:s.name,date:s.date,state:s.state,imageData:isSavedImage(s.imageData)?s.imageData:'',imageId:s.imageId||'',imageName:s.imageName||'',mimeType:s.mimeType||'',width:s.width||0,height:s.height||0,metadata:s.metadata||null};return out}
 function pngPromptSetsPayload(){const out={};for(const item of savedPngPromptSets){const normalized=normalizePngPromptSet(item);if(normalized)out[normalized.id]=normalized}return out}
 function artistTagPresetsPayload(){const out={};for(const item of normalizeArtistTagPresets(artistTagPresets))out[item.id]=item;return out}

@@ -65,6 +65,23 @@
 .artist-ref-thumb{width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;border:1px solid #555675;background:#111322;cursor:zoom-in}
 .artist-ref-empty{font-size:11px;color:var(--muted);margin-top:6px}
 .artist-compat-note{font-size:11px;color:var(--muted);margin:6px 0 0}
+.extra-tag-presets{border:1px solid #454862;border-radius:11px;background:#151728;padding:10px;margin:10px 0 13px}
+.extra-tag-presets h3{margin:0;font-size:12px}
+.extra-tag-preset-toolbar{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+.extra-tag-preset-toolbar select{flex:1 1 220px;min-width:0;border:1px solid #44465f;background:#101222;color:var(--ink);border-radius:9px;padding:9px 10px;min-height:42px}
+.extra-tag-preset-toolbar select[multiple]{min-height:76px}
+.extra-tag-preset-manage{border-top:1px solid #3e405b;margin-top:10px;padding-top:10px}
+.extra-tag-preset-form{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:7px;margin-bottom:9px}
+.extra-tag-preset-form input,.extra-tag-preset-form textarea{width:100%;border:1px solid #44465f;background:#101222;color:var(--ink);border-radius:9px;padding:9px 10px;min-width:0}
+.extra-tag-preset-form textarea{grid-column:1/-1;min-height:52px;resize:vertical}
+.extra-tag-preset-list{display:grid;gap:7px}
+.extra-tag-preset-card{border:1px solid #4a4c67;border-radius:9px;padding:8px;background:#20213a}
+.extra-tag-preset-head{display:flex;gap:8px;justify-content:space-between;align-items:flex-start}
+.extra-tag-preset-name{font-size:12px;font-weight:700;overflow-wrap:anywhere}
+.extra-tag-preset-detail{font-size:11px;color:var(--muted);overflow-wrap:anywhere;margin-top:3px}
+.extra-tag-preset-card .actions{gap:4px;margin-top:7px}
+.extra-tag-preset-card .btn{font-size:11px;padding:6px 8px}
+@media(max-width:480px){.extra-tag-preset-form{grid-template-columns:1fr}.extra-tag-preset-form textarea{grid-column:auto}.extra-tag-preset-toolbar .btn{flex:1 1 140px}}
 @media(max-width:480px){.artist-tags-toolbar{grid-template-columns:1fr}.artist-ref-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:480px){.stylepresets{grid-template-columns:repeat(2,minmax(0,1fr))}.lookthumb{height:113px}}
 /* v6 追加タグ直接入力・男性キャラ */
@@ -294,6 +311,24 @@
        <p class="hint">ここに貼ったタグは「共通プロンプト」に反映。1人目・2人目の追加タグは各個別欄を使ってね。</p>
      </div>
      <div class="actions" style="margin:9px 0 13px"><button type="button" class="btn" id="commitPastedTags">＋ 1個ずつのタグに取り込む</button><button type="button" class="btn ghost" id="clearPastedTags">貼り付け欄をクリア</button></div>
+     <section class="extra-tag-presets" id="extraTagPresetBox" aria-labelledby="extraTagPresetTitle">
+       <div class="outheader"><h3 id="extraTagPresetTitle">追加タグプリセット</h3><span class="small muted" id="extraTagPresetStatus"></span></div>
+       <div class="extra-tag-preset-toolbar">
+         <select id="extraTagPresetSelect" multiple size="3" aria-label="追加タグプリセットを選択"></select>
+         <button type="button" class="btn" id="applyExtraTagPresets">プリセットから追加</button>
+         <button type="button" class="btn" id="saveExtraTagPreset">現在のタグをプリセット保存</button>
+         <button type="button" class="btn ghost" id="manageExtraTagPresets">プリセット管理</button>
+       </div>
+       <div id="extraTagPresetManage" class="extra-tag-preset-manage hide">
+         <div class="extra-tag-preset-form">
+           <input id="extraTagPresetName" type="text" maxlength="48" placeholder="プリセット名（例：柔らかい表情）">
+           <input id="extraTagPresetFolder" type="text" maxlength="40" placeholder="フォルダ（任意）">
+           <textarea id="extraTagPresetDescription" maxlength="300" placeholder="説明（任意）"></textarea>
+         </div>
+         <div class="actions"><button type="button" class="btn primary" id="saveExtraTagPresetForm">この内容で保存</button></div>
+         <div id="extraTagPresetList" class="extra-tag-preset-list"></div>
+       </div>
+     </section>
      <h3>検索から選んだタグ</h3><p class="small muted">タグ検索画面で追加先を選べます。ここでタップすると個別に削除できます。</p><div id="selectedTags" class="chips"></div>
      <div class="actions" style="margin-top:12px"><button class="btn ghost" id="goTags" type="button">＋ タグを探す</button><button class="btn ghost" id="clearSearchTags" type="button">検索タグを一括解除</button><button class="btn ghost" id="clearTags" type="button">追加タグをすべてクリア</button></div>
    </section>
@@ -936,6 +971,75 @@ function clearAdditionalTags(){
  extraTags=[];femaleTags=[];maleTags=[];girl2Tags=[];
  byId('pasteTags').value='';byId('femaleExtras').value='';byId('maleExtra').value='';byId('girl2Extra').value='';
   searchAddedTags=emptySearchAdded();searchAddedTags.negative=negativeSearchTags;favoriteAddedTags=emptySearchAdded();pngAppliedOutputMode=false;
+}
+const EXTRA_TAG_PRESETS_KEY='nai_extra_tag_presets_v1';
+const MAX_EXTRA_TAG_PRESETS=50,MAX_EXTRA_TAGS_PER_PRESET=80;
+let extraTagPresets=[],extraTagPresetStorageError=false;
+function newExtraTagPresetId(){return 'extra-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8)}
+function splitExtraTagPresetTags(value){
+ const source=Array.isArray(value)?value:[String(value||'')];
+ const result=[],seen=new Set();
+ for(const item of source.join(',').split(/[,，\n]+/)){
+  const tag=String(item||'').trim();if(!tag)continue;const key=normalize(tag);if(seen.has(key))continue;seen.add(key);result.push(tag.slice(0,300));
+ }
+ return result.slice(0,MAX_EXTRA_TAGS_PER_PRESET);
+}
+function normalizeExtraTagPreset(value){
+ const source=value&&typeof value==='object'&&!Array.isArray(value)?value:{};
+ return {id:/^[A-Za-z0-9_-]{1,160}$/.test(String(source.id||''))?String(source.id):newExtraTagPresetId(),name:String(source.name||'追加タグプリセット').trim().slice(0,48)||'追加タグプリセット',folder:String(source.folder||'').trim().slice(0,40),description:String(source.description||'').slice(0,300),tags:splitExtraTagPresetTags(source.tags),createdAt:String(source.createdAt||new Date().toISOString()),updatedAt:String(source.updatedAt||source.createdAt||new Date().toISOString())};
+}
+function normalizeExtraTagPresets(value){return (Array.isArray(value)?value:[]).map(normalizeExtraTagPreset).filter(item=>item.tags.length).slice(0,MAX_EXTRA_TAG_PRESETS)}
+function setExtraTagPresetStatus(message,error=false){const el=byId('extraTagPresetStatus');if(el){el.textContent=message;el.style.color=error?'#ffc2c4':'var(--muted)'}}
+function persistExtraTagPresets(){
+ const previous=localStorage.getItem(EXTRA_TAG_PRESETS_KEY);extraTagPresetStorageError=false;
+ try{localStorage.setItem(EXTRA_TAG_PRESETS_KEY,JSON.stringify(normalizeExtraTagPresets(extraTagPresets)));document.dispatchEvent(new Event('nai:statechanged'));document.dispatchEvent(new Event('nai:extratagpresetschanged'));return true}
+ catch(error){extraTagPresetStorageError=true;try{if(previous===null)localStorage.removeItem(EXTRA_TAG_PRESETS_KEY);else localStorage.setItem(EXTRA_TAG_PRESETS_KEY,previous)}catch(_){}setExtraTagPresetStatus('追加タグプリセットを保存できませんでした。既存データは変更していません。',true);return false}
+}
+function readExtraTagPresets(){try{const raw=JSON.parse(localStorage.getItem(EXTRA_TAG_PRESETS_KEY)||'null');if(Array.isArray(raw))extraTagPresets=normalizeExtraTagPresets(raw)}catch(_){extraTagPresets=[]}}
+function currentExtraTagPresetTags(){return splitExtraTagPresetTags([...extraTags,...String(byId('pasteTags')?.value||'').split(/[,，\n]+/)] )}
+function appendExtraTagPresetTags(tags){
+ const existing=new Set([...extraTags,...String(byId('pasteTags')?.value||'').split(/[,，\n]+/).map(tag=>tag.trim()).filter(Boolean)].map(normalize));const added=[];
+ for(const tag of splitExtraTagPresetTags(tags))if(!existing.has(normalize(tag))){extraTags.push(tag);existing.add(normalize(tag));added.push(tag)}
+ return added;
+}
+function applyExtraTagPresetById(id){
+ const preset=extraTagPresets.find(item=>item.id===id);if(!preset)return 0;const added=appendExtraTagPresetTags(preset.tags);refresh();renderExtraTagPresetUI();setExtraTagPresetStatus(added.length?'「'+preset.name+'」から'+added.length+'件を追加しました':'既存タグと重複するため追加はありません');return added.length;
+}
+function applySelectedExtraTagPresets(){
+ const select=byId('extraTagPresetSelect'),ids=[...(select?.selectedOptions||[])].map(option=>option.value);if(!ids.length){setExtraTagPresetStatus('追加するプリセットを選択してください。',true);return}
+ let added=0;for(const id of ids){const preset=extraTagPresets.find(item=>item.id===id);if(preset)added+=appendExtraTagPresetTags(preset.tags).length}
+ refresh();renderExtraTagPresetUI();setExtraTagPresetStatus(added?ids.length+'件のプリセットから'+added+'件を追加しました':'選択したタグはすべて追加済みです');
+}
+function saveExtraTagPresetRecord(record){
+ const previous=JSON.parse(JSON.stringify(extraTagPresets)),normalized=normalizeExtraTagPreset(record),index=extraTagPresets.findIndex(item=>item.id===normalized.id);
+ if(!normalized.tags.length){setExtraTagPresetStatus('保存する追加タグがありません。',true);return false}
+ if(index<0&&extraTagPresets.length>=MAX_EXTRA_TAG_PRESETS){setExtraTagPresetStatus('保存上限の'+MAX_EXTRA_TAG_PRESETS+'件に達しています。',true);return false}
+ if(index<0)extraTagPresets.push(normalized);else extraTagPresets[index]=normalized;
+ if(!persistExtraTagPresets()){extraTagPresets=previous;renderExtraTagPresetUI();return false}
+ renderExtraTagPresetUI();setExtraTagPresetStatus('追加タグプリセット「'+normalized.name+'」を保存しました');return true;
+}
+function saveCurrentExtraTagPreset(){
+ const tags=currentExtraTagPresetTags();if(!tags.length){setExtraTagPresetStatus('先に追加タグを入力または取り込んでください。',true);return}
+ const name=window.prompt('追加タグプリセットの名前', '追加タグセット '+(extraTagPresets.length+1));if(name===null)return;if(!name.trim()){setExtraTagPresetStatus('名前を入力してください。',true);return}
+ const existing=extraTagPresets.find(item=>item.name===name.trim());if(existing&&!window.confirm('同名のプリセットを上書きしますか？'))return;
+ saveExtraTagPresetRecord({id:existing?.id,name:name.trim(),folder:existing?.folder||'',description:existing?.description||'',tags,createdAt:existing?.createdAt,updatedAt:new Date().toISOString()});
+}
+function saveExtraTagPresetForm(){
+ const name=byId('extraTagPresetName')?.value.trim();if(!name){setExtraTagPresetStatus('プリセット名を入力してください。',true);return}
+ const tags=currentExtraTagPresetTags();const existing=extraTagPresets.find(item=>item.name===name);if(existing&&!window.confirm('同名のプリセットを上書きしますか？'))return;
+ if(saveExtraTagPresetRecord({id:existing?.id,name,folder:byId('extraTagPresetFolder')?.value||'',description:byId('extraTagPresetDescription')?.value||'',tags,createdAt:existing?.createdAt,updatedAt:new Date().toISOString()})){byId('extraTagPresetName').value='';byId('extraTagPresetFolder').value='';byId('extraTagPresetDescription').value=''}
+}
+function moveExtraTagPreset(id,delta){const index=extraTagPresets.findIndex(item=>item.id===id),next=index+delta;if(index<0||next<0||next>=extraTagPresets.length)return;[extraTagPresets[index],extraTagPresets[next]]=[extraTagPresets[next],extraTagPresets[index]];if(!persistExtraTagPresets())return;renderExtraTagPresetUI()}
+function duplicateExtraTagPreset(id){const source=extraTagPresets.find(item=>item.id===id);if(!source)return;let name=source.name+'（コピー）',n=2;while(extraTagPresets.some(item=>item.name===name))name=source.name+'（コピー'+n+++'）';saveExtraTagPresetRecord({id:newExtraTagPresetId(),name,folder:source.folder,description:source.description,tags:source.tags,updatedAt:new Date().toISOString()})}
+function editExtraTagPreset(id){const preset=extraTagPresets.find(item=>item.id===id);if(!preset)return;const name=window.prompt('プリセット名',preset.name);if(name===null)return;const tags=window.prompt('英語タグ（カンマ区切り）',preset.tags.join(', '));if(tags===null)return;const folder=window.prompt('フォルダ（任意）',preset.folder||'');if(folder===null)return;const updated={...preset,name:name.trim()||preset.name,tags,folder,updatedAt:new Date().toISOString()};saveExtraTagPresetRecord(updated)}
+function deleteExtraTagPreset(id){const preset=extraTagPresets.find(item=>item.id===id);if(!preset||!window.confirm('「'+preset.name+'」を削除しますか？'))return;const previous=JSON.parse(JSON.stringify(extraTagPresets));extraTagPresets=extraTagPresets.filter(item=>item.id!==id);if(!persistExtraTagPresets()){extraTagPresets=previous;return}renderExtraTagPresetUI();setExtraTagPresetStatus('プリセットを削除しました')}
+function renderExtraTagPresetUI(){
+ const select=byId('extraTagPresetSelect'),list=byId('extraTagPresetList');if(!select||!list)return;const selected=new Set([...(select.selectedOptions||[])].map(option=>option.value));select.replaceChildren();for(const preset of extraTagPresets){const option=document.createElement('option');option.value=preset.id;option.textContent=(preset.folder?preset.folder+' / ':'')+preset.name+'（'+preset.tags.length+'件）';option.title=preset.tags.join(', ');option.selected=selected.has(preset.id);select.appendChild(option)}
+ list.replaceChildren();if(!extraTagPresets.length){const empty=document.createElement('p');empty.className='small muted';empty.textContent='保存済みの追加タグプリセットはありません。';list.appendChild(empty);return}
+ extraTagPresets.forEach((preset,index)=>{const card=document.createElement('div');card.className='extra-tag-preset-card';const head=document.createElement('div');head.className='extra-tag-preset-head';const name=document.createElement('div');name.className='extra-tag-preset-name';name.textContent=(preset.folder?preset.folder+' / ':'')+preset.name;head.appendChild(name);const count=document.createElement('span');count.className='small muted';count.textContent=preset.tags.length+'件';head.appendChild(count);card.appendChild(head);const detail=document.createElement('div');detail.className='extra-tag-preset-detail';detail.textContent=preset.tags.join(', ')+(preset.description?' · '+preset.description:'');card.appendChild(detail);const actions=document.createElement('div');actions.className='actions';const make=(label,fn,variant='')=>{const b=document.createElement('button');b.type='button';b.className='btn'+(variant?' '+variant:'');b.textContent=label;b.addEventListener('click',fn);actions.appendChild(b)};make('追加',()=>applyExtraTagPresetById(preset.id),'primary');make('編集',()=>editExtraTagPreset(preset.id));make('複製',()=>duplicateExtraTagPreset(preset.id));make('↑',()=>moveExtraTagPreset(preset.id,-1));make('↓',()=>moveExtraTagPreset(preset.id,1));make('削除',()=>deleteExtraTagPreset(preset.id),'ghost');card.appendChild(actions);list.appendChild(card)})
+}
+function setupExtraTagPresetUI(){
+ byId('applyExtraTagPresets')?.addEventListener('click',applySelectedExtraTagPresets);byId('saveExtraTagPreset')?.addEventListener('click',saveCurrentExtraTagPreset);byId('saveExtraTagPresetForm')?.addEventListener('click',saveExtraTagPresetForm);byId('manageExtraTagPresets')?.addEventListener('click',()=>{const panel=byId('extraTagPresetManage');if(!panel)return;panel.classList.toggle('hide');if(!panel.classList.contains('hide')){renderExtraTagPresetUI();byId('extraTagPresetName')?.focus()}});renderExtraTagPresetUI();
 }
 const DEFAULT_TAG_SEARCH_MODE='local';
 let searchMode=DEFAULT_TAG_SEARCH_MODE,displayLimit=60,remoteTags=[],remoteError='',remoteLoading=false,remoteLastQuery='',favoriteTags=[];
@@ -1944,7 +2048,7 @@ byId('togglePasteSettings').addEventListener('click',()=>{byId('pasteSettingsAre
 byId('applyPastedSettings').addEventListener('click',loadFromText);
 byId('jumpSnapshots').onclick=()=>byId('snapshotPanel').scrollIntoView({behavior:'smooth',block:'start'});
 
- function exportAll(){const state=captureSettings();const payload={format:'NAI-Prompt-Studio-Settings',version:15,savedAt:new Date().toISOString(),state,customLooks,artistTagPresets:normalizeArtistTagPresets(artistTagPresets),favoriteTags,favoriteCollections,savedSnapshots,pngPromptSets:savedPngPromptSets,draftImageData};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='NAI_Prompt_Studio_backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);byId('copyStatus').textContent='バックアップを書き出しました'}
+ function exportAll(){const state=captureSettings();const payload={format:'NAI-Prompt-Studio-Settings',version:15,savedAt:new Date().toISOString(),state,customLooks,artistTagPresets:normalizeArtistTagPresets(artistTagPresets),extraTagPresets:normalizeExtraTagPresets(extraTagPresets),favoriteTags,favoriteCollections,savedSnapshots,pngPromptSets:savedPngPromptSets,draftImageData};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='NAI_Prompt_Studio_backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);byId('copyStatus').textContent='バックアップを書き出しました'}
 async function importAll(file){try{
  if(!file||file.size>12*1024*1024)throw Error('ファイルが大きすぎます');
  const payload=JSON.parse(await file.text());if(payload.format!=='NAI-Prompt-Studio-Settings'||!payload.state)throw Error('バックアップファイルではありません');
@@ -1952,6 +2056,7 @@ async function importAll(file){try{
   if(Array.isArray(data.artistTags))artistTags=normalizeArtistTags(data.artistTags);extraTags=Array.isArray(data.extraTags)?data.extraTags.filter(x=>typeof x==='string').slice(0,40):[];femaleTags=Array.isArray(data.femaleTags)?data.femaleTags.filter(x=>typeof x==='string').slice(0,40):[];maleTags=Array.isArray(data.maleTags)?data.maleTags.filter(x=>typeof x==='string').slice(0,40):[];girl2Tags=Array.isArray(data.girl2Tags)?data.girl2Tags.filter(x=>typeof x==='string').slice(0,40):[];searchAddedTags=normalizeSearchAdded(data.searchAddedTags);
  if(payload.customLooks&&typeof payload.customLooks==='object'&&!Array.isArray(payload.customLooks)){const previous=customLooks;customLooks=normalizeCustomLooks(payload.customLooks);if(!persistCustomLooks())customLooks=previous}
  if(Array.isArray(payload.artistTagPresets)){const previous=artistTagPresets;artistTagPresets=normalizeArtistTagPresets(payload.artistTagPresets);if(!persistArtistState())artistTagPresets=previous;renderArtistTagUI()}
+ if(Array.isArray(payload.extraTagPresets)){const previous=extraTagPresets;extraTagPresets=normalizeExtraTagPresets(payload.extraTagPresets);if(!persistExtraTagPresets())extraTagPresets=previous;renderExtraTagPresetUI()}
  if(Array.isArray(payload.favoriteTags)){
   const importedTags=payload.favoriteTags.filter(x=>typeof x==='string').slice(0,200);favoriteTags=importedTags;
   if(!payload.favoriteCollections){const known=new Set(favoriteEntries().map(x=>normalize(x.tag)));for(const tag of importedTags)if(!known.has(normalize(tag)))favoriteCollections.uncategorized.push({id:favoriteId('tag'),label:tag,tag});persistFavoriteCollections(false)}else saveFavorites()
@@ -1959,7 +2064,7 @@ async function importAll(file){try{
  if(payload.favoriteCollections&&typeof payload.favoriteCollections==='object'&&!Array.isArray(payload.favoriteCollections)){const previous=favoriteCollections;favoriteCollections=normalizeFavoriteCollections(payload.favoriteCollections);if(!persistFavoriteCollections(false))favoriteCollections=previous;renderFavorites()}
   if(Array.isArray(payload.savedSnapshots)){const previous=savedSnapshots;savedSnapshots=validateSnapshots(payload.savedSnapshots);if(!persistSnapshots())savedSnapshots=previous;renderSnapshots()}
   if(Array.isArray(payload.pngPromptSets)){const previous=savedPngPromptSets;savedPngPromptSets=payload.pngPromptSets.map(normalizePngPromptSet).filter(Boolean).slice(0,200);if(!persistPngPromptSets())savedPngPromptSets=previous;renderPngPromptSets()}
-  setDraftImage(isSavedImage(payload.draftImageData)?payload.draftImageData:'');lastStyleSnapshot=styleFields();refresh();renderCustomLooks();renderArtistTagUI();renderFavorites();byId('copyStatus').textContent=customLooksStorageError?'絵柄保存は容量不足のため復元されませんでした。既存の保存データは維持されています。':snapshotStorageError?'保存セットは容量不足のため復元されませんでした。既存の保存データは維持されています。':artistTagStorageError?'絵師タグ保存は容量不足のため復元されませんでした。既存の保存データは維持されています。':'設定を読み込みました'
+  setDraftImage(isSavedImage(payload.draftImageData)?payload.draftImageData:'');lastStyleSnapshot=styleFields();refresh();renderCustomLooks();renderArtistTagUI();renderExtraTagPresetUI();renderFavorites();byId('copyStatus').textContent=customLooksStorageError?'絵柄保存は容量不足のため復元されませんでした。既存の保存データは維持されています。':snapshotStorageError?'保存セットは容量不足のため復元されませんでした。既存の保存データは維持されています。':artistTagStorageError?'絵師タグ保存は容量不足のため復元されませんでした。既存の保存データは維持されています。':'設定を読み込みました'
  }catch(e){byId('copyStatus').textContent='読み込みに失敗: '+e.message}finally{byId('importSettingsFile').value=''}}
 byId('exportSettings').onclick=exportAll;
 byId('importSettingsBtn').onclick=()=>byId('importSettingsFile').click();
@@ -2199,7 +2304,7 @@ byId('undoStyle').addEventListener('click',()=>{if(!prevLook)return;const now=st
    }
    savePngPromptSet=savePngPromptSetWithAssetReuse;
    setupCollapsiblePanels();
-  loadState();readResetUndo();readCustomLooks();readArtistState();readSnapshots();readFavoriteCollections();readPngPromptSets();setupStylePresetAccordion();watchCustomLookCount();setupArtistTagUI();renderCustomLooks();renderArtistTagUI();renderSnapshots();renderPngPromptSets();lastStyleSnapshot=styleFields();syncViewMode();modeUI();renderTagList();renderFavorites();renderPngPromptEditor();setTagDictMeta('日本語辞書の状態を確認しています…');ensureTagDictionary();
+  loadState();readResetUndo();readCustomLooks();readArtistState();readExtraTagPresets();readSnapshots();readFavoriteCollections();readPngPromptSets();setupStylePresetAccordion();watchCustomLookCount();setupArtistTagUI();setupExtraTagPresetUI();renderCustomLooks();renderArtistTagUI();renderExtraTagPresetUI();renderSnapshots();renderPngPromptSets();lastStyleSnapshot=styleFields();syncViewMode();modeUI();renderTagList();renderFavorites();renderPngPromptEditor();setTagDictMeta('日本語辞書の状態を確認しています…');ensureTagDictionary();
 
 </script>
 <script src="./firebase-config.js"></script>
