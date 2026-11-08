@@ -9,6 +9,8 @@ for (const token of [
   'extraTagPresetSelect',
   'extraTagPresetDestination',
   'extraTagPresetSource',
+  'extraTagPresetTags',
+  'cancelExtraTagPresetEdit',
   'applyExtraTagPresets',
   'saveExtraTagPreset',
   'manageExtraTagPresets',
@@ -29,6 +31,11 @@ assert.ok(html.indexOf('id="extraTagPresetBox"') < html.indexOf('id="pngEditorPa
 assert.ok(html.includes('value="female">キャラ1の追加タグ'), 'character 1 destination must be available');
 assert.ok(html.includes('value="character2">キャラ2の追加タグ'), 'character 2 destination must be available');
 assert.ok(html.includes('value="paste">直接貼り付け欄'), 'direct paste must be an independent save source');
+assert.ok(html.includes('maxlength="24000"'), 'management form must provide a large multi-line tag input');
+assert.ok(html.includes('カンマまたは改行区切り'), 'management form must explain comma/newline input');
+assert.ok(html.includes("splitExtraTagPresetTags(byId('extraTagPresetTags')?.value||'')"), 'direct tag input must be normalized before saving');
+assert.ok(html.includes("editingExtraTagPresetId=preset.id"), 'editing must load the selected preset into the management form');
+assert.ok(html.includes("byId('extraTagPresetTags').value=preset.tags.join(',\\n')"), 'editing must expose existing tags for modification');
 assert.ok(cloud.includes('extraTagPresets:normalizeExtraTagPresets(extraTagPresets)'), 'Firebase profile must include extra tag presets');
 assert.ok(cloud.includes('if(Array.isArray(value.extraTagPresets))'), 'Firebase profile restore must include extra tag presets');
 assert.ok(!html.includes('favoriteTags=normalizeExtraTagPresets'), 'extra presets must not overwrite single-tag favorites');
@@ -55,5 +62,30 @@ assert.deepStrictEqual(Array.from(context.appendExtraTagPresetTags(['blush', 'bl
 assert.deepStrictEqual(Array.from(context.getArrays().femaleTags), ['blush', 'blue eyes'], 'character 1 application must use the character 1 array');
 assert.deepStrictEqual(Array.from(context.appendExtraTagPresetTags(['tall', 'short black hair'], 'character2')), ['tall', 'short black hair'], 'character 2 application must resolve the active male destination');
 assert.deepStrictEqual(Array.from(context.getArrays().maleTags), ['tall', 'short black hair'], 'character 2 application must use the active character 2 array');
+
+const formFields = {
+  extraTagPresetTags: { value: 'silver hair,\nblue eyes, silver hair', focus: () => {} },
+  extraTagPresetName: { value: '直接入力セット' },
+  extraTagPresetFolder: { value: '髪・瞳' },
+  extraTagPresetDescription: { value: '直接入力の確認' },
+  saveExtraTagPresetForm: { textContent: '' },
+  cancelExtraTagPresetEdit: { classList: { add: () => {}, remove: () => {} } },
+  extraTagPresetManage: { classList: { add: () => {}, remove: () => {} } }
+};
+const formContext = {
+  localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
+  document: { dispatchEvent: () => {} },
+  Event: function Event() {},
+  window: { prompt: () => null, confirm: () => true },
+  byId: id => formFields[id] || null
+};
+vm.runInNewContext(`const normalize=s=>String(s).toLowerCase().normalize('NFKC').replace(/[_\\-]/g,' ').replace(/\\s+/g,' ').trim(); let extraTags=[],femaleTags=[],maleTags=[],girl2Tags=[]; ${implementation} this.saveForm=saveExtraTagPresetForm; this.edit=editExtraTagPreset; this.getPresets=()=>extraTagPresets;`, formContext);
+formContext.saveForm();
+assert.deepStrictEqual(Array.from(formContext.getPresets()[0].tags), ['silver hair', 'blue eyes'], 'direct input must save newline/comma tags in order without duplicates');
+formContext.edit(formContext.getPresets()[0].id);
+assert.strictEqual(formFields.extraTagPresetTags.value, 'silver hair,\nblue eyes', 'editing must load tags into the multi-line form');
+formFields.extraTagPresetTags.value = 'red hair\nblue eyes\nred hair';
+formContext.saveForm();
+assert.deepStrictEqual(Array.from(formContext.getPresets()[0].tags), ['red hair', 'blue eyes'], 'edited direct input must replace the existing tag contents');
 
 console.log('extra tag presets, backup, Firebase and dedupe contract: OK');
