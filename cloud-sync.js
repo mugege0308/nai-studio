@@ -28,7 +28,7 @@ try{
 }catch(e){availability.textContent='Firebase初期化エラー：'+e.message;return}
 
 let uid=null,root=null,profileRef=null,snapsRef=null,pngRef=null,artistRef=null,active=false,suppress=false;
-let stateTimer=0,snapTimer=0,pngTimer=0,artistTimer=0,statePending=false,snapsPending=false,pngPending=false,artistPending=false;
+let stateTimer=0,snapTimer=0,pngTimer=0,artistTimer=0,statePending=false,snapsPending=false,pngPending=false,artistPending=false,snapshotWriteInProgress=false;
 let remoteSnapshots={},remotePngPromptSets={},remoteArtistTagPresets={},lastProfile=null; // data of latest server event
 let lastLocalEditAt=0;
 const deviceId=(()=>{
@@ -64,7 +64,7 @@ function cleanRemoteSnapObjects(remote){
  const output={};
  for(const [id,item] of Object.entries(remote||{})){
   if(!item||typeof item!=='object'||!item.state)continue;
-  output[id]={id:item.id||id,name:item.name||'設定',date:item.date||'',state:item.state,imageData:item.imageData||'',imageId:item.imageId||'',imageName:item.imageName||'',mimeType:item.mimeType||'',width:Number(item.width)||0,height:Number(item.height)||0,metadata:item.metadata&&typeof item.metadata==='object'?item.metadata:null};
+  output[id]={id:item.id||id,name:item.name||'設定',date:item.date||'',updatedAt:item.updatedAt||item.date||'',state:item.state,imageData:item.imageData||'',imageId:item.imageId||'',imageName:item.imageName||'',mimeType:item.mimeType||'',width:Number(item.width)||0,height:Number(item.height)||0,metadata:item.metadata&&typeof item.metadata==='object'?item.metadata:null};
  }
  return output;
 }
@@ -123,16 +123,24 @@ function applyIncomingProfile(value){
   if(typeof value.draftImageData==='string')setDraftImage(isSavedImage(value.draftImageData)?value.draftImageData:'');
  }finally{suppress=false}
 }
-function applyIncomingSnapshots(value){
+function scheduleSnapshotPush(){
+ if(!active||!snapsRef||!snapsPending)return;
+ clearTimeout(snapTimer);snapTimer=setTimeout(()=>pushSnapshots(),550);
+}
+function applyIncomingSnapshots(value,options={}){
  suppress=true;
+ let localNeedsUpload=false;
  try{
-  const all=cleanRemoteSnapObjects(value);
-   const previous=savedSnapshots;
-   savedSnapshots=validateSnapshots(Object.values(all).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))));
-   if(!saveLocalIncoming()){savedSnapshots=previous;return}
+  const all=cleanRemoteSnapObjects(value),incoming=Object.values(all),previous=savedSnapshots;
+  const merged=options.merge&&window.NAISnapshotMerge?window.NAISnapshotMerge.merge(previous,incoming):incoming;
+  localNeedsUpload=Boolean(options.merge&&window.NAISnapshotMerge?.localNeedsUpload(previous,incoming));
+   savedSnapshots=validateSnapshots(merged);
+   if(!saveLocalIncoming()){savedSnapshots=previous;localNeedsUpload=false;return}
    renderSnapshots();
-   hydrateRemoteAssets(all).then(()=>renderSnapshots()).catch(()=>{});
+   const assets=Object.fromEntries(savedSnapshots.filter(item=>item.imageId).map(item=>[item.id,item]));
+   hydrateRemoteAssets(assets).then(()=>renderSnapshots()).catch(()=>{});
  }finally{suppress=false}
+ if(localNeedsUpload){snapsPending=true;scheduleSnapshotPush()}
 }
 function applyIncomingPngPromptSets(value){
  if(value===null||value===undefined)return;
@@ -151,7 +159,7 @@ function applyIncomingArtistTagPresets(value){
  suppress=true;try{const incoming=cleanRemoteArtistTagPresetObjects(value),previous=artistTagPresets;artistTagPresets=incoming;if(!persistArtistState()){artistTagPresets=previous;return}renderArtistTagUI();hydrateRemoteArtistAssets(incoming).catch(()=>{})}finally{suppress=false}
 }
 function profilePayload(){return {state:captureSettings(),customLooks,favoriteTags,favoriteCollections,extraTagPresets:normalizeExtraTagPresets(extraTagPresets),draftImageData,updatedAt:firebase.database.ServerValue.TIMESTAMP,source:deviceId}}
-function snapshotsPayload(){const out={};for(const s of savedSnapshots)out[s.id]={id:s.id,name:s.name,date:s.date,state:s.state,imageData:isSavedImage(s.imageData)?s.imageData:'',imageId:s.imageId||'',imageName:s.imageName||'',mimeType:s.mimeType||'',width:s.width||0,height:s.height||0,metadata:s.metadata||null};return out}
+function snapshotsPayload(){const out={};for(const s of savedSnapshots)out[s.id]={id:s.id,name:s.name,date:s.date,updatedAt:s.updatedAt||s.date,state:s.state,imageData:isSavedImage(s.imageData)?s.imageData:'',imageId:s.imageId||'',imageName:s.imageName||'',mimeType:s.mimeType||'',width:s.width||0,height:s.height||0,metadata:s.metadata||null};return out}
 function pngPromptSetsPayload(){const out={};for(const item of savedPngPromptSets){const normalized=normalizePngPromptSet(item);if(normalized)out[normalized.id]=normalized}return out}
 function artistTagPresetsPayload(){const out={};for(const item of normalizeArtistTagPresets(artistTagPresets))out[item.id]=item;return out}
 async function pushProfile(){
@@ -167,6 +175,7 @@ async function pushSnapshots(){
  if(!active||!snapsRef||suppress)return;
  if(!snapsPending)return;
  snapsPending=false;
+ snapshotWriteInProgress=true;
  try{
    const current=snapshotsPayload(),updates=[];
    for(const [id,s] of Object.entries(current))if(JSON.stringify(remoteSnapshots[id])!==JSON.stringify(s))updates.push([id,s]);
@@ -178,6 +187,7 @@ async function pushSnapshots(){
    }
   note('画像付き保存セットをクラウドに同期しました。');
  }catch(e){snapsPending=true;note('保存セットの同期に失敗：'+e.message,true)}
+ finally{snapshotWriteInProgress=false}
 }
 async function pushPngPromptSets(){
  if(!active||!pngRef||suppress)return;
@@ -202,7 +212,7 @@ async function pushArtistTagPresets(){
 function detach(){
  clearTimeout(stateTimer);clearTimeout(snapTimer);clearTimeout(pngTimer);clearTimeout(artistTimer);
  if(profileRef)profileRef.off();if(snapsRef)snapsRef.off();if(pngRef)pngRef.off();if(artistRef)artistRef.off();
- active=false;statePending=false;snapsPending=false;pngPending=false;
+ active=false;statePending=false;snapsPending=false;pngPending=false;snapshotWriteInProgress=false;
  artistPending=false;uid=null;root=null;profileRef=null;snapsRef=null;pngRef=null;artistRef=null;remoteSnapshots={};remotePngPromptSets={};remoteArtistTagPresets={};lastProfile=null;
  el('cloudLiveChoices').classList.add('hide');el('cloudFirstChoice').classList.add('hide');
 }
@@ -210,6 +220,7 @@ function listen(){
  if(!uid||!root)return;
  profileRef=root.child('profile');snapsRef=root.child('snapshots');pngRef=root.child('pngPromptSets');artistRef=root.child('artistTagPresets');active=true;
  el('cloudFirstChoice').classList.add('hide');el('cloudLiveChoices').classList.remove('hide');
+ if(snapsPending)scheduleSnapshotPush();
  profileRef.on('value',s=>{
   const value=s.val();lastProfile=value;
   if(!value||value.source===deviceId)return;
@@ -218,8 +229,10 @@ function listen(){
  },e=>note('設定の受信に失敗：'+e.message,true));
  snapsRef.on('value',s=>{
   const value=s.val()||{};remoteSnapshots=cleanRemoteSnapObjects(value);
-  if(snapsPending)return;
-  applyIncomingSnapshots(remoteSnapshots);
+  if(snapsPending||snapshotWriteInProgress)return;
+  // Live cloud events are merged instead of replacing local data. A delayed
+  // initial Firebase value must not erase a snapshot saved on this device.
+  applyIncomingSnapshots(remoteSnapshots,{merge:true});
  },e=>note('保存セットの受信に失敗：'+e.message,true));
  pngRef.on('value',s=>{
   const value=s.val();if(value===null)return;remotePngPromptSets=cleanRemotePngPromptObjects(value);
@@ -233,20 +246,20 @@ function listen(){
  localStorage.setItem('nai_cloud_active_'+uid,'1');
  note('クラウド同期ON。ほかの端末でも同じアカウントでログインしてください。');
 }
-function importCloudRoot(remote){
+function importCloudRoot(remote,options={}){
  suppress=true;
  try{
   if(remote.profile)applyIncomingProfile(remote.profile);
-  applyIncomingSnapshots(remote.snapshots||{});
+  applyIncomingSnapshots(remote.snapshots||{},options);
    if(Object.prototype.hasOwnProperty.call(remote,'pngPromptSets'))applyIncomingPngPromptSets(remote.pngPromptSets);
    if(Object.prototype.hasOwnProperty.call(remote,'artistTagPresets'))applyIncomingArtistTagPresets(remote.artistTagPresets);
  }finally{suppress=false}
 }
-async function cloudPull(){
+async function cloudPull(options={}){
  if(!root)return false;
  const s=await root.once('value'),val=s.val();
  if(!val||!val.profile){note('クラウドにデータがありません。最初のPCで「この端末の設定をクラウドに保存」を選んでください。',true);return false}
-  importCloudRoot(val);remoteSnapshots=cleanRemoteSnapObjects(val.snapshots||{});if(Object.prototype.hasOwnProperty.call(val,'pngPromptSets'))remotePngPromptSets=cleanRemotePngPromptObjects(val.pngPromptSets);if(Object.prototype.hasOwnProperty.call(val,'artistTagPresets'))remoteArtistTagPresets=Object.fromEntries(cleanRemoteArtistTagPresetObjects(val.artistTagPresets).map(item=>[item.id,item]));
+  importCloudRoot(val,options);remoteSnapshots=cleanRemoteSnapObjects(val.snapshots||{});if(Object.prototype.hasOwnProperty.call(val,'pngPromptSets'))remotePngPromptSets=cleanRemotePngPromptObjects(val.pngPromptSets);if(Object.prototype.hasOwnProperty.call(val,'artistTagPresets'))remoteArtistTagPresets=Object.fromEntries(cleanRemoteArtistTagPresetObjects(val.artistTagPresets).map(item=>[item.id,item]));
  return true;
 }
 async function cloudUpload(){
@@ -325,7 +338,7 @@ auth.onAuthStateChanged(async user=>{
  availability.textContent='ログイン済み。設定は同じアカウントの端末間で同期します。';
  try{
   if(localStorage.getItem('nai_cloud_active_'+uid)==='1'){
-   const ok=await cloudPull();if(ok){listen();return}
+   const ok=await cloudPull({merge:true});if(ok){listen();return}
   }
   el('cloudFirstChoice').classList.remove('hide');el('cloudLiveChoices').classList.add('hide');
   note('初回同期の方向を選んでください。');

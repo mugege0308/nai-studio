@@ -553,6 +553,7 @@
 <script src="./tag-search-category.js"></script>
 <script src="./novelai-metadata.js"></script>
 <script src="./image-store.js"></script>
+<script src="./snapshot-merge.js"></script>
 <script>
 'use strict';
 const opts={
@@ -2024,7 +2025,8 @@ function validateSnapshots(input){
  if(!Array.isArray(input))return result;
  for(const snap of input.slice(0,MAX_SNAPSHOTS)){
   if(!snap||typeof snap.name!=='string'||!snap.state||typeof snap.state!=='object'||Array.isArray(snap.state))continue;
-  result.push({id:typeof snap.id==='string'?snap.id.slice(0,120):makeSnapshotId(),name:snap.name.trim().slice(0,48)||'名称未設定',date:typeof snap.date==='string'?snap.date.slice(0,40):new Date().toISOString(),state:snap.state,imageData:isSavedImage(snap.imageData)?snap.imageData:'',imageId:isImageId(snap.imageId)?snap.imageId:'',imageName:String(snap.imageName||'').slice(0,160),mimeType:String(snap.mimeType||'').slice(0,80),width:Number(snap.width)||0,height:Number(snap.height)||0,metadata:normalizeSnapshotMetadata(snap.metadata)});
+  const date=typeof snap.date==='string'?snap.date.slice(0,40):new Date().toISOString();
+  result.push({id:typeof snap.id==='string'?snap.id.slice(0,120):makeSnapshotId(),name:snap.name.trim().slice(0,48)||'名称未設定',date,updatedAt:typeof snap.updatedAt==='string'?snap.updatedAt.slice(0,40):date,state:snap.state,imageData:isSavedImage(snap.imageData)?snap.imageData:'',imageId:isImageId(snap.imageId)?snap.imageId:'',imageName:String(snap.imageName||'').slice(0,160),mimeType:String(snap.mimeType||'').slice(0,80),width:Number(snap.width)||0,height:Number(snap.height)||0,metadata:normalizeSnapshotMetadata(snap.metadata)});
  }
  return result;
 }
@@ -2042,7 +2044,7 @@ function uniqueSnapshotName(candidate){
 }
 function setSnapshotStatus(message){byId('snapshotStatus').textContent=message;byId('copyStatus').textContent=message}
 function snapshotRecord(id,name,state,imageData,imageId='',meta=null){
- const asset=meta&&typeof meta==='object'?meta:{};return {id,name,date:new Date().toISOString(),state,imageData:isSavedImage(imageData)?imageData:'',imageId:isImageId(imageId)?imageId:'',imageName:String(asset.name||asset.imageName||'').slice(0,160),mimeType:String(asset.mimeType||'').slice(0,80),width:Number(asset.width)||0,height:Number(asset.height)||0,metadata:normalizeSnapshotMetadata(asset.metadata)}
+ const asset=meta&&typeof meta==='object'?meta:{},now=new Date().toISOString();return {id,name,date:now,updatedAt:now,state,imageData:isSavedImage(imageData)?imageData:'',imageId:isImageId(imageId)?imageId:'',imageName:String(asset.name||asset.imageName||'').slice(0,160),mimeType:String(asset.mimeType||'').slice(0,80),width:Number(asset.width)||0,height:Number(asset.height)||0,metadata:normalizeSnapshotMetadata(asset.metadata)}
 }
 function saveNamedSnapshot(duplicate=false,forcedName=''){
   if(savedSnapshots.length>=MAX_SNAPSHOTS){setSnapshotStatus('保存上限の200件に達しています。不要な保存を削除するか、JSONバックアップしてください。');return false}
@@ -2054,7 +2056,7 @@ function saveNamedSnapshot(duplicate=false,forcedName=''){
  setSnapshotStatus(`「${name}」を${duplicate?'複製':'保存'}しました。元の設定はそのまま残ります。`);
  return true;
 }
-function snapshotExport(snap){return JSON.stringify({format:'NAI-Prompt-Studio-Snapshot',version:13,name:snap.name,state:snap.state,imageData:isSavedImage(snap.imageData)?snap.imageData:'',imageId:isImageId(snap.imageId)?snap.imageId:'',imageName:snap.imageName||'',mimeType:snap.mimeType||'',width:snap.width||0,height:snap.height||0,metadata:normalizeSnapshotMetadata(snap.metadata)},null,2)}
+function snapshotExport(snap){return JSON.stringify({format:'NAI-Prompt-Studio-Snapshot',version:13,name:snap.name,state:snap.state,imageData:isSavedImage(snap.imageData)?snap.imageData:'',imageId:isImageId(snap.imageId)?snap.imageId:'',imageName:snap.imageName||'',mimeType:snap.mimeType||'',width:snap.width||0,height:snap.height||0,updatedAt:snap.updatedAt||snap.date||'',metadata:normalizeSnapshotMetadata(snap.metadata)},null,2)}
 function copyCurrentSettings(){const name=byId('snapshotName').value.trim()||'現在の設定';copy(snapshotExport({name,state:captureSettings(),imageData:draftImageData,imageId:draftImageId,imageName:draftImageMeta?.name||'',mimeType:draftImageMeta?.mimeType||'',width:draftImageMeta?.width||0,height:draftImageMeta?.height||0,metadata:draftImageMeta?.metadata||null}),'設定一式（JSON）')}
 function loadFromText(){
  try{
@@ -2095,9 +2097,9 @@ function renderSnapshots(){
   mk('複製',()=>{if(savedSnapshots.length>=MAX_SNAPSHOTS){setSnapshotStatus('保存上限の200件に達しています');return}const dup=snapshotRecord(makeSnapshotId(),uniqueSnapshotName(snap.name+' - コピー'),JSON.parse(JSON.stringify(snap.state)),snap.imageData||'',snap.imageId,snap);savedSnapshots.unshift(dup);if(!persistSnapshots()){savedSnapshots.shift();return}renderSnapshots();setSnapshotStatus(`「${dup.name}」を複製しました。`)});
   mk('コピー',()=>copy(snapshotExport(snap),`「${snap.name}」の設定JSON`));
   if(snap.metadata)mk('生成情報コピー',()=>copy(JSON.stringify(snap.metadata,null,2),`「${snap.name}」の生成情報`));
-  mk('名前変更',()=>{const next=window.prompt('保存名を入力してください',snap.name);if(next===null)return;const clean=next.trim().slice(0,48);if(!clean)return;let final=clean,n=2;while(savedSnapshots.some(x=>x.id!==snap.id&&x.name===final))final=`${clean} (${n++})`;const old=snap.name;snap.name=final;if(!persistSnapshots()){snap.name=old;return}renderSnapshots();setSnapshotStatus(`保存名を「${final}」に変更しました`)});
+  mk('名前変更',()=>{const next=window.prompt('保存名を入力してください',snap.name);if(next===null)return;const clean=next.trim().slice(0,48);if(!clean)return;let final=clean,n=2;while(savedSnapshots.some(x=>x.id!==snap.id&&x.name===final))final=`${clean} (${n++})`;const oldName=snap.name,oldUpdatedAt=snap.updatedAt;snap.name=final;snap.updatedAt=new Date().toISOString();if(!persistSnapshots()){snap.name=oldName;snap.updatedAt=oldUpdatedAt;return}renderSnapshots();setSnapshotStatus(`保存名を「${final}」に変更しました`)});
   mk('画像変更',()=>{replacingSnapshotImageId=snap.id;byId('snapshotImageFile').click()});
-  if(snap.imageData||snap.imageId)mk('画像削除',()=>{const old={imageData:snap.imageData,imageId:snap.imageId,imageName:snap.imageName,mimeType:snap.mimeType,width:snap.width,height:snap.height};snap.imageData='';snap.imageId='';snap.imageName='';snap.mimeType='';snap.width=0;snap.height=0;if(!persistSnapshots()){Object.assign(snap,old)}else releaseAssetIfUnused(old.imageId,snap.id);renderSnapshots()},'ghost');
+  if(snap.imageData||snap.imageId)mk('画像削除',()=>{const old={imageData:snap.imageData,imageId:snap.imageId,imageName:snap.imageName,mimeType:snap.mimeType,width:snap.width,height:snap.height,updatedAt:snap.updatedAt};snap.imageData='';snap.imageId='';snap.imageName='';snap.mimeType='';snap.width=0;snap.height=0;snap.updatedAt=new Date().toISOString();if(!persistSnapshots()){Object.assign(snap,old)}else releaseAssetIfUnused(old.imageId,snap.id);renderSnapshots()},'ghost');
   mk('削除',()=>{if(!confirm(`「${snap.name}」を削除しますか？`))return;const previous=savedSnapshots;savedSnapshots=savedSnapshots.filter(item=>item.id!==snap.id);if(!persistSnapshots()){savedSnapshots=previous;renderSnapshots();return}releaseAssetIfUnused(snap.imageId);renderSnapshots();setSnapshotStatus('保存した画像・設定を削除しました。現在の編集中データはそのままです。')},'ghost');
   contents.appendChild(actions);target.appendChild(row);
  }
@@ -2262,7 +2264,7 @@ async function processImageFile(file){
   try{asset=await window.NAIImageStore.put(file,{name:file.name,mimeType:file.type,width:size.width,height:size.height})}catch(storageError){setSnapshotStatus('元画像本体をIndexedDBへ保存できないため、サムネイルのみ扱います：'+storageError.message,true)}
   if(replacingSnapshotImageId){
    const item=savedSnapshots.find(x=>x.id===replacingSnapshotImageId);if(!item)throw Error('変更対象が見つかりません');
-   const old={imageData:item.imageData,imageId:item.imageId,imageName:item.imageName,mimeType:item.mimeType,width:item.width,height:item.height};item.imageData=data;item.imageId=asset?.id||'';item.imageName=file.name;item.mimeType=file.type;item.width=size.width;item.height=size.height;if(!persistSnapshots()){Object.assign(item,old);if(asset)releaseAssetIfUnused(asset.id);throw Error('保存容量を超えました')}releaseAssetIfUnused(old.imageId,item.id);renderSnapshots();setSnapshotStatus(`「${item.name}」の参考画像を変更しました`);
+   const old={imageData:item.imageData,imageId:item.imageId,imageName:item.imageName,mimeType:item.mimeType,width:item.width,height:item.height,updatedAt:item.updatedAt};item.imageData=data;item.imageId=asset?.id||'';item.imageName=file.name;item.mimeType=file.type;item.width=size.width;item.height=size.height;item.updatedAt=new Date().toISOString();if(!persistSnapshots()){Object.assign(item,old);if(asset)releaseAssetIfUnused(asset.id);throw Error('保存容量を超えました')}releaseAssetIfUnused(old.imageId,item.id);renderSnapshots();setSnapshotStatus(`「${item.name}」の参考画像を変更しました`);
   }else{setDraftImage(data,asset||{name:file.name,mimeType:file.type,width:size.width,height:size.height})}
  }catch(e){byId('imageStatus').textContent='画像エラー：'+e.message;setSnapshotStatus('画像処理エラー：'+e.message)}
  finally{replacingSnapshotImageId=null;byId('snapshotImageFile').value=''}
