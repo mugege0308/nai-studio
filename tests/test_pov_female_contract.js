@@ -41,6 +41,9 @@ for (const [value, label] of [['normal', '指定なし'], ['front', '正面向�
   assert.ok(html.includes(label), `character 2 facing label missing: ${label}`);
 }
 assert.ok(html.includes('id="character2Facing"'));
+assert.ok(html.includes('id="characterFacingTarget"'));
+assert.ok(html.includes('value="character1">キャラ1'));
+assert.ok(html.includes('value="character2" selected>キャラ2'));
 assert.ok(html.includes('id="character2FacingWarning"'));
 
 assert.ok(html.includes("function isFemalePovMode"));
@@ -58,8 +61,10 @@ assert.ok(html.includes("side:{tags:'from side, profile'"));
 assert.ok(html.includes("back:{tags:'from behind, facing away, back to viewer'"));
 assert.ok(html.includes("overShoulder:{tags:'from behind, looking back, over shoulder'"));
 assert.ok(html.includes('function getCharacter2Facing()'));
-assert.ok(html.includes('facingTags:getCharacter2Facing().tags'));
-assert.ok(html.includes("if(comp.kind==='femalePov'&&comp.facingTags)push(female,comp.facingTags)"));
+assert.ok(html.includes('facingTagsForCharacter1'));
+assert.ok(html.includes('facingTagsForCharacter2'));
+assert.ok(html.includes("if(comp.facingTagsForCharacter1)push(female,comp.facingTagsForCharacter1)"));
+assert.ok(html.includes("if(comp.facingTagsForCharacter2)push(male,comp.facingTagsForCharacter2)"));
 assert.ok(html.includes('cameraPrompt'));
 assert.ok(html.includes('girl B as first-person camera'));
 assert.ok(html.includes('girl A in front of camera'));
@@ -78,21 +83,22 @@ assert.ok(!html.includes("female.push('girl A as first-person camera')"), 'camer
 assert.ok(html.includes('画面には1人目の女の子Aが映り、2人目の女の子Bがカメラ側'));
 assert.ok(html.includes('function character2FacingConflicts(mode)'));
 assert.ok(html.includes('手動タグは保持'));
-assert.ok(html.includes('let femalePovRestoreState=null,lastCharacter2Pov=\'normal\''));
-assert.ok(html.includes('femalePovRestoreState={maleMode:byId(\'maleMode\').value,viewMode:byId(\'viewMode\').value}'));
-assert.ok(html.includes('byId(\'maleMode\').value=restore.maleMode;byId(\'viewMode\').value=restore.viewMode'));
+assert.ok(html.includes('let femalePovRestoreState=null,lastCharacter2Pov=\'normal\',characterFacingTargetTouched=false'));
+assert.ok(html.includes('femalePovRestoreState={maleMode:byId(\'maleMode\').value,viewMode:byId(\'viewMode\').value,characterFacingTarget:'));
+assert.ok(html.includes('byId(\'maleMode\').value=restore.maleMode;byId(\'viewMode\').value=restore.viewMode;if(byId(\'characterFacingTarget\'))'));
 assert.ok(!html.includes("if(mode!=='normal'&&isFemalePovMode())byId('character2Pov').value='normal'"), '④ changes must not disable female POV');
 assert.ok(html.includes("p.kind==='femalePov'?[p.count,p.tags]"), 'female POV must be visible in the preview');
 assert.ok(html.includes("p.kind==='femalePov'?p:getPov()"), 'female POV copy must use the active composition');
 assert.ok(html.includes("if(comp.kind==='femalePov'){"));
-assert.ok(html.includes('if(!wasFemale&&!femalePovRestoreState)femalePovRestoreState'));
+assert.ok(html.includes('if(!wasFemale&&!femalePovRestoreState){femalePovRestoreState='));
 assert.ok(html.includes("if(isFemalePovMode()&&mode!=='girl2'){byId('character2Pov').value='normal';lastCharacter2Pov='normal';femalePovRestoreState=null}"));
 assert.ok(html.includes("function migratePovState(state)"));
+assert.ok(html.includes("copy.characterFacingTarget=isFemalePovMode(copy.character2Pov)?'character1':'character2'"));
 assert.ok(html.includes('syncViewMode();'));
 
 // The existing state capture path already carries viewMode/maleMode into presets,
 // Firebase state, JSON backup, and structured TXT state.
-assert.ok(html.includes("'viewMode','maleMode','character2Pov','character2Facing'"));
+assert.ok(html.includes("'viewMode','maleMode','character2Pov','character2Facing','characterFacingTarget'"));
 assert.ok(html.includes('state:captureSettings()'));
 assert.ok(html.includes('JSON.stringify({format:\'NAI-Prompt-Studio-TXT-State\''));
 
