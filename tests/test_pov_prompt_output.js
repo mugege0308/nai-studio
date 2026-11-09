@@ -8,7 +8,7 @@ const end = html.indexOf('function refreshPov(){', start);
 assert.ok(start >= 0 && end > start, 'prompt functions must remain embedded in index.html');
 
 const values = {
-  maleMode: 'girl2', character2Pov: 'fpovlook', viewMode: 'povhold', character2Facing: 'normal', characterFacingTarget: 'character1',
+  maleMode: 'girl2', character2Pov: 'fpovlook', viewMode: 'povhold', character2Facing: 'normal', characterFacingTarget: 'character1', femalePovCharacter2Range: 'auto',
   character: 'on-screen girl', outfit: '', pose: '', scene: '', expression: '', camera: '',
   extras: '', femaleExtras: 'blue eyes, shy smile', pasteTags: '',
   girl2Character: 'camera girl', girl2Appearance: 'silver hair', girl2Outfit: 'dress',
@@ -28,6 +28,7 @@ assert.strictEqual(migratedFemale.character2Pov, 'fpovlook', 'legacy female POV 
 assert.strictEqual(migratedFemale.characterFacingTarget, 'character1', 'legacy female POV facing must remain on the on-screen character');
 const migratedNormal = context.migratePovState({ viewMode: 'normal', character2Pov: 'normal' });
 assert.strictEqual(migratedNormal.characterFacingTarget, 'character2', 'legacy normal settings must default facing to character 2');
+assert.strictEqual(migratedNormal.femalePovCharacter2Range, 'auto', 'legacy settings must default camera-side display range to auto');
 
 let result = context.buildPrompts();
 assert.ok(result.base.includes('pov hands'), '④ hand/POV tags must remain in the common prompt');
@@ -45,6 +46,18 @@ assert.ok(result.base.includes('holding hands'), 'female POV hand action must re
 assert.ok(result.female.includes('from behind, facing away, back to viewer'), 'back-facing tags must target character 1');
 assert.ok(result.female.includes('arms behind back'), 'back-facing double-hand preset must remain on character 1');
 assert.ok(result.male.includes('only hands visible in foreground'), 'camera-side hand visibility must remain on character 2');
+
+values.character2Pov = 'fpovlook';
+values.maleMode = 'girl2';
+values.femalePovCharacter2Range = 'none';
+result = context.buildPrompts();
+assert.ok(result.male.includes('no visible body'), 'display-none range must keep camera-side character out of the image');
+assert.ok(!result.male.includes('silver hair'), 'display-none range must not emit camera-side appearance tags');
+
+values.femalePovCharacter2Range = 'hands_arms';
+result = context.buildPrompts();
+assert.ok(result.male.includes('hands and forearms visible in foreground'), 'hands-and-arms range must emit foreground limb guidance');
+assert.ok(result.male.includes('silver hair'), 'visible camera-side range must retain character 2 appearance tags');
 
 values.character2Pov = 'normal';
 values.viewMode = 'normal';

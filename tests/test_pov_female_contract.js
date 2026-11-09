@@ -50,7 +50,7 @@ assert.ok(html.includes("function isFemalePovMode"));
 assert.ok(html.includes('id="character2Pov"'));
 assert.ok(html.includes('function syncCharacter2Pov()'));
 assert.ok(html.includes("kind:'femalePov'"));
-assert.ok(html.includes("tags:[femalePov.tags,femaleOverlay.tags].filter(Boolean).join(', ')"), 'female POV must retain compatible section ④ tags');
+assert.ok(html.includes("tags:[femalePovBaseTags(),femaleOverlay.tags].filter(Boolean).join(', ')"), 'female POV must retain compatible section ④ tags');
 assert.ok(html.includes('function femalePovViewOverlay'));
 assert.ok(html.includes("povhand')return {tags:'pov hands, one hand reaching from bottom foreground, looking at viewer'"));
 assert.ok(html.includes("povhold')return {tags:'pov hands, holding hands, looking at viewer'"));
@@ -74,10 +74,14 @@ assert.ok(html.includes("forcedFacing:'back'"));
 assert.ok(html.includes('handsOnly:true'));
 assert.ok(html.includes('includeCharacter2Details:false'));
 assert.ok(html.includes('function femalePovShowsCameraPart'));
+assert.ok(html.includes('function femalePovBaseTags'));
 assert.ok(html.includes('function femalePovCharacter2Specific'));
+assert.ok(html.includes('femalePovCharacter2RangeModes'));
+assert.ok(html.includes('id="femalePovCharacter2Range"'));
+for (const value of ['none', 'hands', 'hands_arms', 'auto', 'wide']) assert.ok(html.includes(`value="${value}"`), `camera-side display range missing: ${value}`);
 assert.ok(html.includes('pushMany(male,femalePovCharacter2Specific())'));
 assert.ok(html.includes("if(girl2Tags.length)pushMany(male,girl2Tags,extraSource)"));
-assert.ok(html.includes('return girl2Specific()'), 'female POV must preserve character 2 tags in the character 2 output');
+assert.ok(html.includes('range.includeCharacter2Details?girl2Specific():[]'), 'female POV must conditionally emit camera-side character details');
 assert.ok(!html.includes('femalePovIncludesCharacter2Details'), 'female POV must not suppress character 2 tags by visibility mode');
 assert.ok(!html.includes("female.push('girl A as first-person camera')"), 'camera role must not be assigned to character 1');
 assert.ok(html.includes('画面には1人目の女の子Aが映り、2人目の女の子Bがカメラ側'));
@@ -94,11 +98,12 @@ assert.ok(html.includes('if(!wasFemale&&!femalePovRestoreState){femalePovRestore
 assert.ok(html.includes("if(isFemalePovMode()&&mode!=='girl2'){byId('character2Pov').value='normal';lastCharacter2Pov='normal';femalePovRestoreState=null}"));
 assert.ok(html.includes("function migratePovState(state)"));
 assert.ok(html.includes("copy.characterFacingTarget=isFemalePovMode(copy.character2Pov)?'character1':'character2'"));
+assert.ok(html.includes("copy.femalePovCharacter2Range='auto'"));
 assert.ok(html.includes('syncViewMode();'));
 
 // The existing state capture path already carries viewMode/maleMode into presets,
 // Firebase state, JSON backup, and structured TXT state.
-assert.ok(html.includes("'viewMode','maleMode','character2Pov','character2Facing','characterFacingTarget'"));
+assert.ok(html.includes("'viewMode','maleMode','character2Pov','femalePovCharacter2Range','character2Facing','characterFacingTarget'"));
 assert.ok(html.includes('state:captureSettings()'));
 assert.ok(html.includes('JSON.stringify({format:\'NAI-Prompt-Studio-TXT-State\''));
 
