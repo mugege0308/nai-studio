@@ -231,6 +231,10 @@
           <option value="offscreen">男性は画面外（気配だけ）</option>
         </select>
       </div>
+       <div class="field full"><label for="character2EditType">2人目の設定を編集・コピー</label>
+        <select id="character2EditType"><option value="male" selected>男性の設定</option><option value="girl2">女の子の設定</option></select>
+        <p class="hint" id="character2EditHint">生成に使わない場合でも、選んだ2人目の設定を保持・編集・コピーできます。人数・構図は変更しません。</p>
+       </div>
        <div class="field"><label for="character2Pov">2人目の映り方・女性主観</label>
          <select id="character2Pov">
            <option value="normal">通常表示（女性主観なし）</option>
@@ -301,6 +305,9 @@
       </div>
       <p class="fieldnote" id="maleHint">2人目の種類を選択して設定してください。</p>
       <div class="manpreview" id="malePreview" aria-live="polite"></div>
+      <div class="fieldnote" style="margin-top:9px">現在選択中の2人目設定（生成人数とは独立）</div>
+      <div class="manpreview" id="character2StoredPreview" aria-live="polite"></div>
+      <div class="actions" style="margin-top:8px"><button type="button" class="btn" id="copyCharacter2Settings">⧉ 現在の2人目設定をコピー</button></div>
     </section>
     <section class="panel" id="povPanel"><h2>④ 主観・相手の映り方（POV）</h2>
     <p class="small muted">「女の子が主役、相手は手だけ」の構図を、ほかのシチュや絵柄を壊さず追加できます。③女性主観と④の構図タグは併用でき、矛盾する男性指定だけ警告します。</p>
@@ -827,6 +834,7 @@ for(const [value,label] of [['upstream:0','上流：一般タグ'],['upstream:4'
  function migratePovState(state){
   const copy=state&&typeof state==='object'&&!Array.isArray(state)?{...state}:{};
   if(copy.maleDetailMode!=='auto'&&copy.maleDetailMode!=='detailed')copy.maleDetailMode='detailed';
+  if(copy.character2EditType!=='male'&&copy.character2EditType!=='girl2')copy.character2EditType=copy.maleMode==='girl2'?'girl2':'male';
   if(isFemalePovMode(copy.viewMode)){if(!isFemalePovMode(copy.character2Pov))copy.character2Pov=copy.viewMode;copy.viewMode='normal'}
   if(!Object.prototype.hasOwnProperty.call(copy,'characterFacingTarget'))copy.characterFacingTarget=isFemalePovMode(copy.character2Pov)?'character1':'character2';
   if(!['character1','character2'].includes(copy.characterFacingTarget))copy.characterFacingTarget='character2';
@@ -869,6 +877,21 @@ function maleSpecific(){
 function girl2Specific(){
  const fields=['girl2Character','girl2Appearance','girl2Outfit','girl2Action','girl2Extra'];
  return fields.map(id=>byId(id).value.trim()).filter(Boolean);
+}
+function character2EditType(){return byId('character2EditType')?.value==='girl2'?'girl2':'male'}
+function character2SettingsParts(type=character2EditType()){
+ const fields=type==='girl2'?['girl2Character','girl2Appearance','girl2Outfit','girl2Action','girl2Extra']:['maleCharacter','maleAppearance','maleOutfit','maleAction','maleExtra'];
+ return [(type==='girl2'?'girl':'boy'),...fields.map(id=>byId(id)?.value.trim()).filter(Boolean)];
+}
+function character2SettingsText(type=character2EditType()){return character2SettingsParts(type).filter(Boolean).join(',\n')}
+function refreshCharacter2Editor(){
+ const type=character2EditType(),isGirl2=type==='girl2',text=character2SettingsText(type);
+ byId('maleFields')?.classList.toggle('hide',isGirl2);
+ byId('girl2Fields')?.classList.toggle('hide',!isGirl2);
+ byId('maleDetailModeField')?.classList.toggle('hide',isGirl2);
+ const hint=byId('character2EditHint');if(hint)hint.textContent=isGirl2?'女の子の設定を編集中です。生成に使わない場合も入力内容は保存されます。':'男性の設定を編集中です。おまかせでも入力済みの詳細設定は保持されます。';
+ const preview=byId('character2StoredPreview');if(preview)preview.textContent=text||'未設定（性別タグだけをコピーできます）';
+ const copyButton=byId('copyCharacter2Settings');if(copyButton)copyButton.disabled=!text;
 }
 // NovelAI V5: ベースプロンプトには人数と場面、個別には girl/boy と各人物の特徴を入れる。
 // PNG編集から反映したときだけ、追加されたPNGタグを優先し、自動生成タグの同一項目を抑制する。
@@ -936,16 +959,9 @@ function refreshPov(){
  const hasMale=m==='visible'||m==='faceless';
  const hasGirl2=m==='girl2';
  const maleDetailMode=byId('maleDetailMode')?.value||'detailed';
- const maleAuto=hasMale&&maleDetailMode==='auto';
- byId('maleDetailModeField')?.classList.toggle('hide',!hasMale);
- byId('maleFields').classList.toggle('hide',hasGirl2);
- byId('girl2Fields').classList.toggle('hide',!hasGirl2);
- byId('maleFields').classList.toggle('disabledfields',m==='none');
- for(const id of ['maleCharacter','maleAppearance','maleOutfit','maleExtra'])byId(id).disabled=!hasMale||maleAuto;
- byId('maleAction').disabled=m==='none'||hasGirl2;
- for(const id of ['girl2Character','girl2Appearance','girl2Outfit','girl2Action','girl2Extra'])byId(id).disabled=!hasGirl2;
-  byId('maleHint').textContent=p.kind==='femalePov'?(p.cameraHandsOnly?'女性主観：画面には1人目の女の子Aが後ろ向きで映り、2人目の女の子Bは両手だけを画面手前に出します。キャラ2の外見・衣装は出力しません。':'女性主観：画面には1人目の女の子Aが映り、2人目の女の子Bがカメラ側です。手や身体の一部を映す場合だけ、キャラ2の設定を反映します。'):m==='none'?'2人目を追加すると、専用のキャラクタープロンプトを使えます。':hasGirl2?'2人目の女の子の特徴を「キャラクター2」に出力します。1人目とは別々にコピーできます。':hasMale?(maleAuto?'男性は1boyの存在指定と動作・構図だけを出力し、外見はモデルに任せます。保存済みの詳細設定は保持されます。':'男性の外見・服装・動作を「キャラクター2」に出力します。'):'男性を手だけ・画面外にするモードです。外見やキャラ名は出力せず、動作のみ共通に反映します。';
-  const maleDetailHint=byId('maleDetailModeHint');if(maleDetailHint&&hasMale)maleDetailHint.textContent=maleAuto?'おまかせ中：男性のキャラ名・外見・服装・追加タグは一時的に出力しません。入力内容は保存されます。':'詳細設定：男性のキャラ名・外見・服装・追加タグを出力します。';
+ refreshCharacter2Editor();
+  byId('maleHint').textContent=p.kind==='femalePov'?(p.cameraHandsOnly?'女性主観：画面には1人目の女の子Aが後ろ向きで映り、2人目の女の子Bは両手だけを画面手前に出します。キャラ2の外見・衣装は出力しません。':'女性主観：画面には1人目の女の子Aが映り、2人目の女の子Bがカメラ側です。手や身体の一部を映す場合だけ、キャラ2の設定を反映します。'):m==='none'?'2人目を追加すると、専用のキャラクタープロンプトを使えます。':hasGirl2?'2人目の女の子の特徴を「キャラクター2」に出力します。1人目とは別々にコピーできます。':hasMale?(maleDetailMode==='auto'?'男性は1boyの存在指定と動作・構図だけを出力し、外見はモデルに任せます。保存済みの詳細設定は保持されます。':'男性の外見・服装・動作を「キャラクター2」に出力します。'):'男性を手だけ・画面外にするモードです。外見やキャラ名は出力せず、動作のみ共通に反映します。';
+  const maleDetailHint=byId('maleDetailModeHint');if(maleDetailHint&&character2EditType()==='male')maleDetailHint.textContent=maleDetailMode==='auto'?'おまかせ中：男性のキャラ名・外見・服装・追加タグはメイン出力しません。入力内容は保持・コピーできます。':'詳細設定：男性のキャラ名・外見・服装・追加タグを出力します。';
   const parts=p.kind==='femalePov'?[...femalePovCharacter2Specific(),...(getFemalePovCharacter2Range().includeCharacter2Details?girl2Tags:[]),p.facingTagsForCharacter2]:hasGirl2?girl2Specific():maleSpecific();
   byId('malePreview').textContent=m==='none'?'2人目の個別プロンプトなし':[p.count,p.tags,...parts].filter(Boolean).join(', ');
   const range=getFemalePovCharacter2Range();byId('femalePovCharacter2Range').disabled=p.kind!=='femalePov';
@@ -1593,10 +1609,10 @@ byId('addFavoriteFolder').onclick=addFavoriteFolder;byId('renameFavoriteFolder')
 byId('addManualFavorite').onclick=openManualFavorite;byId('manualFavoriteType').addEventListener('change',updateManualFavoriteFolders);byId('saveManualFavorite').onclick=saveManualFavorite;byId('closeManualFavorite').onclick=closeManualFavorite;
 byId('favoriteChooserType').addEventListener('change',updateFavoriteChooserFolders);byId('saveFavoriteChoice').onclick=saveFavoriteChoice;byId('closeFavoriteChooser').onclick=closeFavoriteChooser;byId('removeFavoriteChoice').onclick=()=>{if(favoriteChooserState&&removeFavoriteEverywhere(favoriteChooserState.tag)){closeFavoriteChooser();renderFavorites();renderTagList();setFavoriteStatus('お気に入りから削除しました')}};
 
-const stateIds=['character','outfit','pose','scene','expression','camera','viewMode','maleMode','maleDetailMode','character2Pov','femalePovCharacter2Range','character2Facing','characterFacingTarget','maleCharacter','maleAppearance','maleOutfit','maleAction','maleExtra','girl2Character','girl2Appearance','girl2Outfit','girl2Action','girl2Extra','pasteTags','style','extras','femaleExtras','negative','seed','useQuality','useSolo','stylePartsMode','styleDirectMode','styleDirectTags','styleArtistOther',...partIds];
+const stateIds=['character','outfit','pose','scene','expression','camera','viewMode','maleMode','maleDetailMode','character2EditType','character2Pov','femalePovCharacter2Range','character2Facing','characterFacingTarget','maleCharacter','maleAppearance','maleOutfit','maleAction','maleExtra','girl2Character','girl2Appearance','girl2Outfit','girl2Action','girl2Extra','pasteTags','style','extras','femaleExtras','negative','seed','useQuality','useSolo','stylePartsMode','styleDirectMode','styleDirectTags','styleArtistOther',...partIds];
 function saveState(){try{const data={};for(const id of stateIds)data[id]=byId(id).type==='checkbox'?byId(id).checked:byId(id).value;data.artistTags=normalizeArtistTags(artistTags);data.extraTags=extraTags;data.femaleTags=femaleTags;data.maleTags=maleTags;data.girl2Tags=girl2Tags;data.searchAddedTags=searchAddedTags;data.favoriteAddedTags=favoriteAddedTags;data.pngAppliedOutputMode=pngAppliedOutputMode;data.panelCollapse=panelCollapseState();localStorage.setItem('nai_prompt_studio_v13',JSON.stringify(data));document.dispatchEvent(new Event('nai:statechanged'))}catch(e){}}
  function loadState(){try{const source=JSON.parse(localStorage.getItem('nai_prompt_studio_v13')||localStorage.getItem('nai_prompt_studio_v12')||localStorage.getItem('nai_prompt_studio_v11')||localStorage.getItem('nai_prompt_studio_v10')||localStorage.getItem('nai_prompt_studio_v9')||localStorage.getItem('nai_prompt_studio_v8')||localStorage.getItem('nai_prompt_studio_v7')||localStorage.getItem('nai_prompt_studio_v6')||localStorage.getItem('nai_prompt_studio_v5')||localStorage.getItem('nai_prompt_studio_v4')||localStorage.getItem('nai_prompt_studio_v1')||'null');if(!source)return;const data=migratePovState(source);for(const id of stateIds){if(!(id in data))continue;const el=byId(id);if(el.type==='checkbox')el.checked=Boolean(data[id]);else if(el.tagName!=='SELECT'||[...el.options].some(opt=>opt.value===data[id]))el.value=data[id]}if(Array.isArray(data.artistTags))artistTags=normalizeArtistTags(data.artistTags);extraTags=Array.isArray(data.extraTags)?data.extraTags.filter(x=>typeof x==='string').slice(0,40):[];femaleTags=Array.isArray(data.femaleTags)?data.femaleTags.filter(x=>typeof x==='string').slice(0,40):[];maleTags=Array.isArray(data.maleTags)?data.maleTags.filter(x=>typeof x==='string').slice(0,40):[];girl2Tags=Array.isArray(data.girl2Tags)?data.girl2Tags.filter(x=>typeof x==='string').slice(0,40):[];searchAddedTags=normalizeSearchAdded(data.searchAddedTags);favoriteAddedTags=normalizeSearchAdded(data.favoriteAddedTags);pngAppliedOutputMode=Boolean(data.pngAppliedOutputMode);applyPanelCollapse(data.panelCollapse)}catch(e){}}
- function setValues(dict){dict={maleMode:'none',maleDetailMode:'detailed',character2Pov:'normal',femalePovCharacter2Range:'auto',character2Facing:'normal',characterFacingTarget:'character2',maleCharacter:'',maleAppearance:'',maleOutfit:'',maleAction:'',maleExtra:'',girl2Character:'',girl2Appearance:'',girl2Outfit:'',girl2Action:'',girl2Extra:'',pasteTags:'',femaleExtras:'',...dict};for(const [id,value] of Object.entries(dict)){if(byId(id)){if(byId(id).type==='checkbox')byId(id).checked=Boolean(value);else byId(id).value=value}}extraTags=[];femaleTags=[];maleTags=[];girl2Tags=[];searchAddedTags=emptySearchAdded();favoriteAddedTags=emptySearchAdded();pngAppliedOutputMode=false;refresh();byId('copyStatus').textContent='プリセットを適用しました'}
+ function setValues(dict){dict={maleMode:'none',maleDetailMode:'detailed',character2EditType:dict&&dict.maleMode==='girl2'?'girl2':'male',character2Pov:'normal',femalePovCharacter2Range:'auto',character2Facing:'normal',characterFacingTarget:'character2',maleCharacter:'',maleAppearance:'',maleOutfit:'',maleAction:'',maleExtra:'',girl2Character:'',girl2Appearance:'',girl2Outfit:'',girl2Action:'',girl2Extra:'',pasteTags:'',femaleExtras:'',...dict};for(const [id,value] of Object.entries(dict)){if(byId(id)){if(byId(id).type==='checkbox')byId(id).checked=Boolean(value);else byId(id).value=value}}extraTags=[];femaleTags=[];maleTags=[];girl2Tags=[];searchAddedTags=emptySearchAdded();favoriteAddedTags=emptySearchAdded();pngAppliedOutputMode=false;refresh();byId('copyStatus').textContent='プリセットを適用しました'}
 const presets={
  default:{outfit:'',pose:'',scene:'',expression:'gentle smile, blush',camera:'cowboy shot, three-quarter view',viewMode:'normal',extras:'',femaleExtras:''},
  bath:{character:'saeki miria (mahou shoujo no majo saiban)',outfit:'cozy pajamas',pose:'sitting on bed',scene:'cozy bedroom, evening',expression:'gentle smile, blush',camera:'cowboy shot, three-quarter view',viewMode:'normal',extras:'after bath, towel around neck, damp hair ends',femaleExtras:''},
@@ -2162,6 +2178,7 @@ for(const id of stateIds){
 }
 byId('maleMode').addEventListener('change',()=>{syncMaleMode();renderTagList()});
 byId('maleDetailMode').addEventListener('change',refresh);
+byId('copyCharacter2Settings').addEventListener('click',()=>{const type=character2EditType(),text=character2SettingsText(type);if(text)copy(text,type==='girl2'?'2人目の女の子設定':'2人目の男性設定')});
 byId('viewMode').addEventListener('change',syncViewMode);
 byId('character2Pov').addEventListener('change',syncCharacter2Pov);
 byId('femalePovCharacter2Range').addEventListener('change',refresh);

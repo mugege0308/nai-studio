@@ -103,7 +103,7 @@ assert.ok(html.includes('syncViewMode();'));
 
 // The existing state capture path already carries viewMode/maleMode into presets,
 // Firebase state, JSON backup, and structured TXT state.
-assert.ok(html.includes("'viewMode','maleMode','maleDetailMode','character2Pov','femalePovCharacter2Range','character2Facing','characterFacingTarget'"));
+assert.ok(html.includes("'viewMode','maleMode','maleDetailMode','character2EditType','character2Pov','femalePovCharacter2Range','character2Facing','characterFacingTarget'"));
 assert.ok(html.includes('state:captureSettings()'));
 assert.ok(html.includes('JSON.stringify({format:\'NAI-Prompt-Studio-TXT-State\''));
 
