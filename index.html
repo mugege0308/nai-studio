@@ -884,6 +884,7 @@ function character2SettingsParts(type=character2EditType()){
  return [(type==='girl2'?'girl':'boy'),...fields.map(id=>byId(id)?.value.trim()).filter(Boolean)];
 }
 function character2SettingsText(type=character2EditType()){return character2SettingsParts(type).filter(Boolean).join(',\n')}
+function copyCharacter2SettingsPrompt(){const text=character2SettingsText();copy(text,'2人目個別プロンプト')}
 function refreshCharacter2Editor(){
  const type=character2EditType(),isGirl2=type==='girl2',text=character2SettingsText(type);
  byId('maleFields')?.classList.toggle('hide',isGirl2);
@@ -1002,14 +1003,15 @@ function syncViewMode(){
 }
 function refresh(){
  const p=buildPrompts();
- for(const [key,id] of [['base','basePromptOutput'],['female','femalePromptOutput'],['male','malePromptOutput']])byId(id).textContent=p[key]||(key==='male'?'（キャラクター2の個別プロンプトは不要）':'');
- byId('baseLength').textContent=p.base.length+'文字';byId('femaleLength').textContent=p.female.length+'文字';byId('maleLength').textContent=p.male.length+'文字';
+ const character2Text=character2SettingsText();
+ for(const [key,id] of [['base','basePromptOutput'],['female','femalePromptOutput']])byId(id).textContent=p[key]||'';
+ byId('malePromptOutput').textContent=character2Text||'（2人目の設定は空欄です）';
+ byId('baseLength').textContent=p.base.length+'文字';byId('femaleLength').textContent=p.female.length+'文字';byId('maleLength').textContent=character2Text.length+'文字';
  byId('promptLength').textContent=(p.base.length+p.female.length+p.male.length)+'文字';
- byId('copyMalePrompt').disabled=!p.male;
- const maleIndividual=Boolean(p.male);
- byId('maleOutputGroup').classList.toggle('inactive',!maleIndividual);
- byId('secondOutputTitle').textContent=byId('maleMode').value==='girl2'?'③ 女の子2人目 / キャラクター2':'③ 男性 / キャラクター2';
- byId('maleOutputHint').textContent=maleIndividual?'NovelAIの2番目のキャラクター欄へ貼り付け。':'2人目なし・手だけ・画面外のときは個別欄が不要です。';
+ byId('copyMalePrompt').disabled=false;
+ byId('maleOutputGroup').classList.remove('inactive');
+ byId('secondOutputTitle').textContent=character2EditType()==='girl2'?'③ 女の子2人目 / キャラクター2':'③ 男性 / キャラクター2';
+ byId('maleOutputHint').textContent='保存済みの2人目設定を表示・コピーします。生成人数・構図への使用状態とは独立しています。';
  renderChips();refreshStyleView();refreshPov();saveState();
  lastCharacter2Pov=byId('character2Pov').value;
 }
@@ -2178,7 +2180,7 @@ for(const id of stateIds){
 }
 byId('maleMode').addEventListener('change',()=>{syncMaleMode();renderTagList()});
 byId('maleDetailMode').addEventListener('change',refresh);
-byId('copyCharacter2Settings').addEventListener('click',()=>{const type=character2EditType(),text=character2SettingsText(type);if(text)copy(text,type==='girl2'?'2人目の女の子設定':'2人目の男性設定')});
+byId('copyCharacter2Settings').addEventListener('click',copyCharacter2SettingsPrompt);
 byId('viewMode').addEventListener('change',syncViewMode);
 byId('character2Pov').addEventListener('change',syncCharacter2Pov);
 byId('femalePovCharacter2Range').addEventListener('change',refresh);
@@ -2205,7 +2207,7 @@ byId('jumpExtra').onclick=()=>{byId('extraPanel').scrollIntoView({behavior:'smoo
 async function copy(text,label){let ok=false;try{if(navigator.clipboard&&window.isSecureContext){await navigator.clipboard.writeText(text);ok=true}}catch(e){}if(!ok){const t=document.createElement('textarea');t.value=text;t.style.position='fixed';t.style.opacity='0';document.body.appendChild(t);t.focus();t.select();try{ok=document.execCommand('copy')}catch(e){}t.remove()}if(ok){byId('copyStatus').textContent=label+'をコピーしました！'}else{byId('copyStatus').textContent='自動コピーできませんでした。表示された文章を長押ししてコピーしてください。'}return ok}
 byId('copyBasePrompt').onclick=()=>copy(buildPrompts().base,'共通プロンプト');
 byId('copyFemalePrompt').onclick=()=>copy(buildPrompts().female,'女の子個別プロンプト');
-byId('copyMalePrompt').onclick=()=>copy(buildPrompts().male,'2人目個別プロンプト');
+byId('copyMalePrompt').onclick=copyCharacter2SettingsPrompt;
 byId('copyNegative').onclick=()=>copy(byId('negative').value,'UC');
 // v12: save structured text and allow roundtrip as distinct NovelAI prompt fields.
 function structuredText(p,uc,state){

@@ -3,6 +3,11 @@ const fs = require('fs');
 const vm = require('vm');
 
 const html = fs.readFileSync('index.html', 'utf8');
+assert.ok(html.includes("const character2Text=character2SettingsText()"), 'output screen must use independent character 2 text');
+assert.ok(html.includes("byId('malePromptOutput').textContent=character2Text||'（2人目の設定は空欄です）'"), 'output screen must display saved character 2 settings');
+assert.ok(html.includes("byId('copyMalePrompt').disabled=false"), 'output copy must not be disabled by generation mode');
+assert.ok(html.includes("byId('copyMalePrompt').onclick=copyCharacter2SettingsPrompt"), 'output copy must use the independent character 2 helper');
+assert.ok(html.includes("byId('copyCharacter2Settings').addEventListener('click',copyCharacter2SettingsPrompt)"), 'panel copy must share the output copy helper');
 const start = html.indexOf('function character2EditType()');
 const end = html.indexOf('function buildPrompts()', start);
 assert.ok(start >= 0 && end > start, 'independent character 2 helpers must exist');
